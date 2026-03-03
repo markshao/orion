@@ -233,3 +233,27 @@ func (wm *WorkspaceManager) RemoveNode(nodeName string) error {
 	// 5. Persist State
 	return wm.SaveState()
 }
+
+// MergeNode merges the node's shadow branch into its logical branch.
+func (wm *WorkspaceManager) MergeNode(nodeName string, cleanup bool) error {
+	node, exists := wm.State.Nodes[nodeName]
+	if !exists {
+		return fmt.Errorf("node '%s' does not exist", nodeName)
+	}
+
+	fmt.Printf("Merging node '%s' (shadow: %s) into logical branch '%s'...\n", nodeName, node.ShadowBranch, node.LogicalBranch)
+
+	commitMsg := fmt.Sprintf("Squash merge from DevSwarm node '%s'", nodeName)
+	if err := git.SquashMerge(wm.State.RepoPath, node.LogicalBranch, node.ShadowBranch, commitMsg); err != nil {
+		return fmt.Errorf("merge failed: %w", err)
+	}
+
+	fmt.Println("Merge successful!")
+
+	if cleanup {
+		fmt.Printf("Cleaning up node '%s'...\n", nodeName)
+		return wm.RemoveNode(nodeName)
+	}
+
+	return nil
+}

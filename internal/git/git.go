@@ -82,3 +82,30 @@ func CreateBranch(repoPath, branchName, basePoint string) error {
 	}
 	return nil
 }
+
+// SquashMerge merges sourceBranch into targetBranch with --squash option.
+// It performs checkout, merge --squash, and commit.
+func SquashMerge(repoPath, targetBranch, sourceBranch, commitMsg string) error {
+	// 1. Checkout target branch
+	checkoutCmd := exec.Command("git", "checkout", targetBranch)
+	checkoutCmd.Dir = repoPath
+	if output, err := checkoutCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to checkout %s: %s: %w", targetBranch, string(output), err)
+	}
+
+	// 2. Merge --squash
+	mergeCmd := exec.Command("git", "merge", "--squash", sourceBranch)
+	mergeCmd.Dir = repoPath
+	if output, err := mergeCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to merge --squash %s: %s: %w", sourceBranch, string(output), err)
+	}
+
+	// 3. Commit
+	commitCmd := exec.Command("git", "commit", "-m", commitMsg)
+	commitCmd.Dir = repoPath
+	if output, err := commitCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to commit merge: %s: %w", string(output), err)
+	}
+
+	return nil
+}

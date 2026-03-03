@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"strings"
+
 	"devswarm/internal/git"
 	"devswarm/internal/workspace"
 
@@ -23,9 +25,11 @@ Clones the repository into a 'repo' subdirectory and sets up configuration.`,
 		if len(args) > 1 {
 			dirName = args[1]
 		} else {
-			// Infer from repo name (e.g. https://github.com/foo/bar.git -> bar_swarm)
-			// For now, let's keep it simple
-			dirName = "devswarm_workspace"
+			// Infer from repo name (e.g. https://github.com/foo/bar.git -> bar_workspace)
+			base := filepath.Base(repoURL)
+			// Remove .git suffix if present
+			base = strings.TrimSuffix(base, ".git")
+			dirName = fmt.Sprintf("%s_workspace", base)
 		}
 
 		fmt.Printf("Initializing DevSwarm for %s in %s...\n", repoURL, dirName)

@@ -70,7 +70,7 @@ myapp_devswarm/
 | `devswarm enter <name>`          | 进入 Node 对应的 Tmux Session          | ✅ 已实现 |
 | `devswarm ls`                    | 列出所有活跃 Node 及其状态             | ✅ 已实现 |
 | `devswarm rm <name>`             | 删除 Node (清理 Worktree 和 Session)   | ✅ 已实现 |
-| `devswarm merge`                 | 将 Node 代码合并回逻辑分支             | 🚧 待开发 |
+| `devswarm merge`                 | 将 Node 代码合并回逻辑分支             | ✅ 已实现 |
 
 ## 快速开始
 
@@ -106,7 +106,7 @@ devswarm rm auth-test-node
 
 ## 待办事项 (Roadmap)
 
-- [ ] **Merge Command**: 实现 `devswarm merge`，支持将 Shadow Branch 的变更 Squash Merge 回 Logical Branch。
+- [x] **Merge Command**: 实现 `devswarm merge`，支持将 Shadow Branch 的变更 Squash Merge 回 Logical Branch。
 - [ ] **Agent Hooks**: 为 Node 生命周期添加 Hook (post-spawn, pre-merge)，以便自动启动 AI Agent。
 - [ ] **Conflict Handling**: 增强 Git 操作的错误处理，当 Worktree 创建失败或分支冲突时提供更友好的提示。
 - [ ] **Config Management**: 完善 `config.yaml` 支持，允许自定义 Tmux 配置文件路径等。

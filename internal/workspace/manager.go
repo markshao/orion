@@ -27,7 +27,14 @@ type WorkspaceManager struct {
 }
 
 // NewManager creates a manager for an existing workspace.
+// It checks if the current directory is a valid DevSwarm workspace root.
 func NewManager(rootPath string) (*WorkspaceManager, error) {
+	// Strict check: .devswarm MUST exist in the current directory
+	metaPath := filepath.Join(rootPath, MetaDir)
+	if _, err := os.Stat(metaPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("not a devswarm workspace: %s not found in %s", MetaDir, rootPath)
+	}
+
 	wm := &WorkspaceManager{
 		RootPath: rootPath,
 		State:    &types.State{},

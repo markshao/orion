@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"devswarm/internal/log"
+
 	"github.com/spf13/cobra"
 )
 
@@ -13,6 +15,16 @@ var rootCmd = &cobra.Command{
 	Short: "DevSwarm - AI-native development environment manager",
 	Long: `DevSwarm provides an abstraction layer over Git worktrees and Tmux sessions,
 enabling concurrent development nodes for human and AI collaboration.`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Initialize logger
+		if err := log.Init(); err != nil {
+			// Fail silently on log init error, just print to stderr
+			fmt.Fprintf(os.Stderr, "Warning: Failed to init logger: %v\n", err)
+		}
+	},
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		log.Close()
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Hello DevSwarm! 🐝")
 		fmt.Println("Ready to spawn some nodes.")

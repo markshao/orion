@@ -14,6 +14,15 @@ In the era of AI Coding, traditional Git workflows struggle to support multi-tas
 
 ## 📦 Installation
 
+### Prerequisites
+
+Ensure you have the following tools installed on your system:
+
+- **Git** (v2.20+)
+- **Tmux** (v3.0+)
+
+### Install via Script
+
 We provide an automated installation script that downloads the latest binary release from GitHub and configures autocompletion.
 
 ```bash

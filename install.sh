@@ -70,6 +70,8 @@ if [ -w "$INSTALL_DIR" ]; then
     mv "$TMP_DIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
 else
     echo "  (Needs sudo permission to move binary)"
+    # Use /dev/tty to force interactive password entry even when running via pipe
+    sudo -v < /dev/tty
     sudo mv "$TMP_DIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
 fi
 

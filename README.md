@@ -163,18 +163,27 @@ DevSwarm can automatically attach your IDE terminal to the correct Node's Tmux s
 
 ## 💻 IDE Integration (VSCode / Trae)
 
-DevSwarm automatically generates and maintains a standard `.code-workspace` file for seamless integration with VSCode and Trae IDE.
+DevSwarm automatically generates and maintains a standard `.code-workspace` file for seamless integration with modern IDEs. This allows you to edit files across multiple nodes simultaneously within a single IDE window, with full language server support.
 
-### How to use
-1. After running `devswarm init` or `devswarm spawn`, a workspace file (e.g., `myproject.code-workspace`) is created in the root.
-2. **In VSCode / Trae**:
+### Visual Studio Code
+
+1. **Open Workspace**:
    - Go to **File** -> **Open Workspace from File...**
-   - Select the generated `.code-workspace` file.
-3. You will see a multi-root workspace with:
-   - `main_repo`: The primary repository.
-   - `workspaces/<node-name>`: Each active node as a separate root folder.
+   - Select the `{project}.code-workspace` file generated in the root directory.
 
-This allows you to edit files across multiple nodes simultaneously within a single IDE window, with full language server support.
+2. **Multi-Root View**:
+   - You will see a workspace structure containing:
+     - `main_repo`: The primary repository (source of truth).
+     - `workspaces/<node-name>`: Each active node as a separate root folder.
+
+### Trae IDE
+
+1. **Import Workspace**:
+   - Use **File** -> **Open Workspace...** to load the configuration.
+   - Trae will recognize the multi-root structure and index all nodes.
+
+2. **AI Context**:
+   - By opening the workspace, Trae's AI can access context from all active nodes, allowing for cross-node refactoring and understanding.
 
 ## 🏗 Architecture
 

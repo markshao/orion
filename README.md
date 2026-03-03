@@ -129,14 +129,34 @@ Manually remove a node and release all resources (Worktree, Branch, Session).
 devswarm rm login-test
 ```
 
-## 💻 IDE Integration (VS Code / Trae)
+## 💻 IDE Integration (Trae / VS Code)
+
+DevSwarm provides deep integration with modern IDEs to enhance your workflow.
+
+### 1. Workspace Integration (Recommended)
+
+DevSwarm automatically generates and maintains a standard `.code-workspace` file. Importing this allows you to edit files across multiple nodes simultaneously within a single IDE window, with full language server support.
+
+**Using Trae IDE:**
+
+1. **Import Workspace**:
+   - Use **File** -> **Open Workspace...** to load the configuration.
+   - Select the `{project}.code-workspace` file generated in the root directory.
+   - Trae will recognize the multi-root structure and index all nodes.
+
+2. **AI Context**:
+   - By opening the workspace, Trae's AI can access context from all active nodes, allowing for cross-node refactoring and understanding.
+
+*(Note: VS Code users can also open the same `.code-workspace` file via **File** -> **Open Workspace from File...**)*
+
+### 2. Terminal Integration
 
 DevSwarm can automatically attach your IDE terminal to the correct Node's Tmux session based on the file you are currently editing.
 
-### Setup Instructions
+**Setup Instructions:**
 
-1.  Open your VS Code `settings.json`.
-2.  Add or replace the following configuration:
+1. Open your IDE's `settings.json`.
+2. Add or replace the following configuration:
 
 ```json
   "terminal.integrated.env.osx": {
@@ -153,40 +173,13 @@ DevSwarm can automatically attach your IDE terminal to the correct Node's Tmux s
   "terminal.integrated.defaultProfile.osx": "devswarm-tmux"
 ```
 
-> **Note**: We use the `CURRENT_FILE` environment variable because VS Code argument expansion (`${file}`) can sometimes behave inconsistently in certain contexts.
+> **Note**: We use the `CURRENT_FILE` environment variable because argument expansion (`${file}`) can sometimes behave inconsistently in certain contexts.
 
-### How it works
+**How it works:**
 
 - When you open a terminal (`Ctrl + ~`), DevSwarm detects if the active file (passed via `CURRENT_FILE`) belongs to a specific **Node**.
 - If it does, you are automatically attached to that node's **Tmux session**.
 - If not, you are attached to a **default** session.
-
-## 💻 IDE Integration (Trae / VS Code)
-
-DevSwarm automatically generates and maintains a standard `.code-workspace` file for seamless integration with modern IDEs. This allows you to edit files across multiple nodes simultaneously within a single IDE window, with full language server support.
-
-### Trae IDE (Recommended)
-
-Trae is an AI-native IDE that can fully leverage DevSwarm's multi-node context.
-
-1. **Import Workspace**:
-   - Use **File** -> **Open Workspace...** to load the configuration.
-   - Select the `{project}.code-workspace` file generated in the root directory.
-   - Trae will recognize the multi-root structure and index all nodes.
-
-2. **AI Context**:
-   - By opening the workspace, Trae's AI can access context from all active nodes, allowing for cross-node refactoring and understanding.
-
-### Visual Studio Code
-
-1. **Open Workspace**:
-   - Go to **File** -> **Open Workspace from File...**
-   - Select the `{project}.code-workspace` file generated in the root directory.
-
-2. **Multi-Root View**:
-   - You will see a workspace structure containing:
-     - `main_repo`: The primary repository (source of truth).
-     - `workspaces/<node-name>`: Each active node as a separate root folder.
 
 
 ## 🏗 Architecture

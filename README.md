@@ -1,5 +1,7 @@
 # DevSwarm 🐝
 
+English | [中文](README_cn.md)
+
 **DevSwarm** is an AI-native development environment manager designed to facilitate concurrent collaboration between humans and AI agents.
 
 In the era of AI Coding, traditional Git workflows struggle to support multi-task concurrency on the same logical branch. DevSwarm solves this by virtualizing Git branches into **Nodes**, where each node provides an isolated environment (Worktree + Tmux Session) for humans or agents to work independently without conflict.

@@ -14,19 +14,18 @@ In the era of AI Coding, traditional Git workflows struggle to support multi-tas
 
 ## 📦 Installation
 
-We provide an automated installation script that handles compilation, installation, and autocompletion setup.
+We provide an automated installation script that downloads the latest binary release from GitHub and configures autocompletion.
 
 ```bash
-git clone https://github.com/markshao/DevSwarm.git
-cd DevSwarm
-./install.sh
+curl -sL https://raw.githubusercontent.com/markshao/DevSwarm/main/install.sh | bash
 ```
 
 This will:
 
-1. Compile the binary using `go build`.
-2. Install `devswarm` to `/usr/local/bin`.
-3. Configure autocompletion for your shell (Zsh/Bash).
+1. Detect your OS and Architecture.
+2. Download the latest binary from [GitHub Releases](https://github.com/markshao/DevSwarm/releases).
+3. Install `devswarm` to `/usr/local/bin`.
+4. Configure autocompletion for your shell (Zsh/Bash).
 
 ## 🎮 Playground (Try it out!)
 

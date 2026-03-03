@@ -131,10 +131,13 @@ DevSwarm can automatically attach your IDE terminal to the correct Node's Tmux s
 2.  Add or replace the following configuration:
 
 ```json
+  "terminal.integrated.env.osx": {
+    "CURRENT_FILE": "${file}"
+  },
   "terminal.integrated.profiles.osx": {
     "devswarm-tmux": {
       "path": "/usr/local/bin/devswarm",
-      "args": ["auto-attach", "${file}"],
+      "args": ["auto-attach"],
       "icon": "terminal-tmux",
       "cwd": "${fileDirname}"
     }
@@ -142,9 +145,11 @@ DevSwarm can automatically attach your IDE terminal to the correct Node's Tmux s
   "terminal.integrated.defaultProfile.osx": "devswarm-tmux"
 ```
 
+> **Note**: We use the `CURRENT_FILE` environment variable because VS Code argument expansion (`${file}`) can sometimes behave inconsistently in certain contexts.
+
 ### How it works
 
-- When you open a terminal (`Ctrl + ~`), DevSwarm detects if the active file belongs to a specific **Node**.
+- When you open a terminal (`Ctrl + ~`), DevSwarm detects if the active file (passed via `CURRENT_FILE`) belongs to a specific **Node**.
 - If it does, you are automatically attached to that node's **Tmux session**.
 - If not, you are attached to a **default** session.
 

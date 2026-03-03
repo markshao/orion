@@ -137,7 +137,7 @@ DevSwarm can automatically attach your IDE terminal to the correct Node's Tmux s
   "terminal.integrated.profiles.osx": {
     "devswarm-tmux": {
       "path": "/usr/local/bin/devswarm",
-      "args": ["auto-attach"],
+      "args": ["auto-attach", "${env:CURRENT_FILE}"],
       "icon": "terminal-tmux",
       "cwd": "${fileDirname}"
     }

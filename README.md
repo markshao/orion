@@ -14,60 +14,111 @@ In the era of AI Coding, traditional Git workflows struggle to support multi-tas
 
 ## 📦 Installation
 
+We provide an automated installation script that handles compilation, installation, and autocompletion setup.
+
 ```bash
-git clone https://github.com/your-username/devswarm.git
-cd devswarm
-make build
-# Binary is located at ./bin/devswarm
+git clone https://github.com/markshao/DevSwarm.git
+cd DevSwarm
+./install.sh
 ```
 
-## 🛠 Usage
+This will:
+
+1. Compile the binary using `go build`.
+2. Install `devswarm` to `/usr/local/bin`.
+3. Configure autocompletion for your shell (Zsh/Bash).
+
+## 🎮 Playground (Try it out!)
+
+DevSwarm comes with an automated **End-to-End (E2E) Test Script** that simulates a full user workflow. This is the best way to understand how DevSwarm works without polluting your environment.
+
+```bash
+# Run the E2E test script
+./playground/test_e2e.sh
+```
+
+This script will:
+
+- Initialize a workspace.
+- Spawn a node.
+- Simulate coding work.
+- Merge changes back.
+- Clean up resources.
+
+## 🛠 Usage Guide
 
 ### 1. Initialize Workspace
-Create a new DevSwarm workspace for a repository.
+
+Create a DevSwarm workspace for a Git repository.
 
 ```bash
-# Creates a directory 'my_project_swarm' and clones the repo
-./bin/devswarm init https://github.com/user/repo.git my_project_swarm
-cd my_project_swarm
+# Automatically creates 'repo_workspace' directory (e.g. DevSwarm_workspace)
+devswarm init https://github.com/markshao/DevSwarm.git
+
+# Or specify a custom directory name
+devswarm init https://github.com/markshao/DevSwarm.git my_custom_workspace
 ```
+
+> **Note**: All subsequent commands must be run inside the workspace directory.
 
 ### 2. Spawn Nodes
-Create isolated nodes for different tasks.
+
+Create isolated nodes for concurrent tasks.
 
 ```bash
-# Spawn a node for human development
-./bin/devswarm spawn feature/login login-human --purpose coding
+cd DevSwarm_workspace
 
-# Spawn a node for an AI agent to run tests (auto-creates branch from main if missing)
-./bin/devswarm spawn feature/login login-test --base main --purpose agent-test
+# Spawn a node for a new feature (creates branch from main if missing)
+devswarm spawn feature/login login-dev --base main --purpose coding
+
+# Spawn another node for testing the same feature concurrently
+devswarm spawn feature/login login-test --base feature/login --purpose testing
 ```
 
-### 3. List Nodes
+### 3. Enter Node (Tmux)
+
+Jump into the isolated development environment (Tmux Session) of a node.
+
+```bash
+devswarm enter login-dev
+```
+
+_You are now inside a Tmux session. The working directory is `nodes/login-dev`. Use `Ctrl+b, d` to detach._
+
+### 4. List Nodes
+
 Check the status of all active nodes.
 
 ```bash
-./bin/devswarm ls
+devswarm ls
 ```
-*Output:*
+
+_Output:_
+
 ```text
 NODE          BRANCH         PURPOSE      SESSION   CREATED
-login-human   feature/login  coding       STOPPED   2023-10-27T10:00:00Z
-login-test    feature/login  agent-test   RUNNING   2023-10-27T10:05:00Z
+login-dev     feature/login  coding       RUNNING   2023-10-27T10:00:00Z
+login-test    feature/login  testing      STOPPED   2023-10-27T10:05:00Z
 ```
 
-### 4. Enter Node
-Jump into the Tmux session of a node to start working.
+### 5. Merge Node
+
+Merge the changes from a node (Shadow Branch) back to the main Logical Branch.
 
 ```bash
-./bin/devswarm enter login-human
+# Squash merge and keep the node
+devswarm merge login-dev
+
+# Squash merge and automatically remove the node
+devswarm merge login-dev --cleanup
 ```
 
-### 5. Cleanup
-Remove a node and release all resources (Worktree, Branch, Session).
+### 6. Remove Node
+
+Manually remove a node and release all resources (Worktree, Branch, Session).
 
 ```bash
-./bin/devswarm rm login-test
+devswarm rm login-test
 ```
 
 ## 🏗 Architecture

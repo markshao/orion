@@ -146,10 +146,10 @@ func (wm *WorkspaceManager) LoadState() error {
 
 // SpawnNode creates a new development node.
 // 1. Validates inputs (creates logical branch if needed)
-// 2. Creates shadow branch
+// 2. Creates shadow branch (if isShadow=true) or uses logical branch directly
 // 3. Creates git worktree
 // 4. Updates state
-func (wm *WorkspaceManager) SpawnNode(nodeName, logicalBranch, baseBranch, purpose string) error {
+func (wm *WorkspaceManager) SpawnNode(nodeName, logicalBranch, baseBranch, purpose string, isShadow bool) error {
 	// 0. Check if node already exists
 	if wm.State.Nodes == nil {
 		wm.State.Nodes = make(map[string]types.Node)
@@ -171,14 +171,30 @@ func (wm *WorkspaceManager) SpawnNode(nodeName, logicalBranch, baseBranch, purpo
 	}
 
 	// 2. Define paths and branch names
-	// Shadow branch format: devswarm/<node_name>/<logical_branch>
-	shadowBranch := fmt.Sprintf("devswarm/%s/%s", nodeName, logicalBranch)
 	worktreePath := filepath.Join(wm.RootPath, WorkspacesDir, nodeName)
+	var shadowBranch string
 
-	// 3. Create worktree + shadow branch
-	// This runs: git worktree add -b <shadow> <path> <logical>
-	if err := git.AddWorktree(wm.State.RepoPath, worktreePath, shadowBranch, logicalBranch); err != nil {
-		return fmt.Errorf("failed to create worktree: %w", err)
+	if isShadow {
+		// Shadow Mode: Create a temporary branch based on logicalBranch
+		// Naming: ds-shadow/<node_name>/<logical_branch>
+		shadowBranch = fmt.Sprintf("ds-shadow/%s/%s", nodeName, logicalBranch)
+		// We use logicalBranch as the base for the shadow branch
+		if err := git.AddWorktree(wm.State.RepoPath, worktreePath, shadowBranch, logicalBranch); err != nil {
+			return fmt.Errorf("failed to create shadow worktree: %w", err)
+		}
+	} else {
+		// Feature Mode: Directly use the logical branch
+		shadowBranch = logicalBranch // In this mode, shadow branch IS the logical branch
+		// We use logicalBranch as both the branch to checkout and the base (git worktree add <path> <branch>)
+		// Note: git worktree add <path> <branch> checks out that branch.
+		// Unlike 'git worktree add -b <new> <path> <base>', here we don't use -b.
+		// We need to adjust internal/git/git.go AddWorktree to support this, or call a different function.
+		// For now, let's see if we can reuse AddWorktree with same names or if we need a new helper.
+		// Current AddWorktree uses `git worktree add -b <shadow> <path> <base>`
+		// If shadow == base, we should use `git worktree add <path> <base>`
+		if err := git.AddWorktree(wm.State.RepoPath, worktreePath, shadowBranch, logicalBranch); err != nil {
+			return fmt.Errorf("failed to create worktree on branch '%s': %w", logicalBranch, err)
+		}
 	}
 
 	// 4. Update State
@@ -283,14 +299,19 @@ func (wm *WorkspaceManager) MergeNode(nodeName string, cleanup bool) error {
 		return fmt.Errorf("node '%s' does not exist", nodeName)
 	}
 
-	fmt.Printf("Merging node '%s' (shadow: %s) into logical branch '%s'...\n", nodeName, node.ShadowBranch, node.LogicalBranch)
+	if node.ShadowBranch == node.LogicalBranch {
+		fmt.Printf("Node '%s' is running directly on logical branch '%s'. No merge needed.\n", nodeName, node.LogicalBranch)
+		// If cleanup is requested, we still proceed to cleanup
+	} else {
+		fmt.Printf("Merging node '%s' (shadow: %s) into logical branch '%s'...\n", nodeName, node.ShadowBranch, node.LogicalBranch)
 
-	commitMsg := fmt.Sprintf("Squash merge from DevSwarm node '%s'", nodeName)
-	if err := git.SquashMerge(wm.State.RepoPath, node.LogicalBranch, node.ShadowBranch, commitMsg); err != nil {
-		return fmt.Errorf("merge failed: %w", err)
+		commitMsg := fmt.Sprintf("Squash merge from DevSwarm node '%s'", nodeName)
+		if err := git.SquashMerge(wm.State.RepoPath, node.LogicalBranch, node.ShadowBranch, commitMsg); err != nil {
+			return fmt.Errorf("merge failed: %w", err)
+		}
+
+		fmt.Println("Merge successful!")
 	}
-
-	fmt.Println("Merge successful!")
 
 	if cleanup {
 		fmt.Printf("Cleaning up node '%s'...\n", nodeName)

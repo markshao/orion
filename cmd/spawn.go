@@ -12,18 +12,42 @@ import (
 var (
 	baseBranch string
 	purpose    string
+	isShadow   bool
 )
 
 var spawnCmd = &cobra.Command{
-	Use:   "spawn [logical_branch] [node_name]",
+	Use:   "spawn [branch_name] [node_name]",
 	Short: "Create a new development node",
-	Long: `Creates a new node with a dedicated git worktree and shadow branch.
-This does NOT automatically start a tmux session (use 'enter' for that).
+	Long: `Creates a new node with a dedicated git worktree.
 
-If the logical branch does not exist, provide --base to create it from a base branch.`,
+Arguments:
+  branch_name: The branch you want to work on or use as a base.
+  node_name:   A unique name for this development environment.
+
+Modes:
+1. Feature Mode (Default):
+   Directly works on the specified branch.
+   Best for developing new features.
+
+   Example:
+   $ devswarm spawn feature/login login-dev
+   # Creates node 'login-dev' working directly on branch 'feature/login'
+
+   $ devswarm spawn feature/new-idea my-node --base main
+   # Creates 'feature/new-idea' from 'main' and works on it
+
+2. Shadow Mode (--shadow):
+   Creates a temporary shadow branch (ds-shadow/...) based on the branch_name.
+   Best for code reviews, testing, or experimental changes without polluting the branch.
+
+   Example:
+   $ devswarm spawn feature/login review-node --shadow
+   # Creates node 'review-node' on branch 'ds-shadow/review-node/feature/login'
+
+If the branch_name does not exist, provide --base to create it from a base branch.`,
 	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		logicalBranch := args[0]
+		branchName := args[0]
 		nodeName := args[1]
 
 		cwd, err := os.Getwd()
@@ -40,9 +64,13 @@ If the logical branch does not exist, provide --base to create it from a base br
 			os.Exit(1)
 		}
 
-		fmt.Printf("Spawning node '%s' for branch '%s'...\n", nodeName, logicalBranch)
+		mode := "Feature Mode"
+		if isShadow {
+			mode = "Shadow Mode"
+		}
+		fmt.Printf("Spawning node '%s' for branch '%s' (%s)...\n", nodeName, branchName, mode)
 
-		if err := wm.SpawnNode(nodeName, logicalBranch, baseBranch, purpose); err != nil {
+		if err := wm.SpawnNode(nodeName, branchName, baseBranch, purpose, isShadow); err != nil {
 			fmt.Printf("Failed to spawn node: %v\n", err)
 			os.Exit(1)
 		}
@@ -55,5 +83,6 @@ If the logical branch does not exist, provide --base to create it from a base br
 func init() {
 	spawnCmd.Flags().StringVarP(&baseBranch, "base", "b", "", "Base branch to create the logical branch from if it doesn't exist")
 	spawnCmd.Flags().StringVarP(&purpose, "purpose", "p", "", "Purpose tag for this node (e.g. 'review', 'test')")
+	spawnCmd.Flags().BoolVar(&isShadow, "shadow", false, "Create a shadow branch instead of using the logical branch directly")
 	rootCmd.AddCommand(spawnCmd)
 }

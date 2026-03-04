@@ -46,10 +46,19 @@ func DeleteBranch(repoPath, branch string) error {
 	return nil
 }
 
-// AddWorktree creates a new worktree for the given branch at the specified path.
-// It runs: git worktree add -b <new_branch> <path> <start_point>
+// AddWorktree creates a new worktree.
+// If newBranch is different from startPoint, it creates a new branch (git worktree add -b <new> <path> <start>).
+// If newBranch is same as startPoint, it checks out the existing branch (git worktree add <path> <start>).
 func AddWorktree(repoPath, worktreePath, newBranch, startPoint string) error {
-	cmd := exec.Command("git", "worktree", "add", "-b", newBranch, worktreePath, startPoint)
+	var cmd *exec.Cmd
+	if newBranch == startPoint {
+		// Existing branch mode: git worktree add <path> <branch>
+		cmd = exec.Command("git", "worktree", "add", worktreePath, startPoint)
+	} else {
+		// New branch mode: git worktree add -b <new_branch> <path> <start_point>
+		cmd = exec.Command("git", "worktree", "add", "-b", newBranch, worktreePath, startPoint)
+	}
+
 	cmd.Dir = repoPath // Execute in the main repo directory
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

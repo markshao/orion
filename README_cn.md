@@ -73,16 +73,22 @@ devswarm init https://github.com/markshao/DevSwarm.git my_custom_workspace
 
 ### 2. 创建节点 (Spawn)
 
-为并发任务创建隔离节点。
+为并发任务创建隔离节点。`devswarm` 支持两种模式：
+
+#### 功能模式 (默认)
+直接在功能分支上工作。最适合开发新功能。
 
 ```bash
-cd DevSwarm_workspace
-
-# 为新功能创建一个节点 (如果分支不存在则从 main 创建)
+# 直接在 'feature/login' 分支上创建节点。如果分支不存在，则从 'main' 创建。
 devswarm spawn feature/login login-dev --base main --purpose coding
+```
 
-# 为同一功能创建另一个节点用于并发测试
-devswarm spawn feature/login login-test --base feature/login --purpose testing
+#### 影子模式 (Shadow Mode, --shadow)
+基于目标分支创建一个临时的影子分支 (`ds-shadow/...`)。最适合代码审查、测试或实验性更改，而不会污染主分支。
+
+```bash
+# 基于 'feature/login' 创建一个审查节点，而不检出该分支本身
+devswarm spawn feature/login login-review --shadow --purpose review
 ```
 
 ### 3. 进入节点 (Tmux)

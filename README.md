@@ -73,16 +73,24 @@ devswarm init https://github.com/markshao/DevSwarm.git my_custom_workspace
 
 ### 2. Spawn Nodes
 
-Create isolated nodes for concurrent tasks.
+Create isolated nodes for concurrent tasks. `devswarm` supports two modes:
+
+#### Feature Mode (Default)
+
+Directly work on a feature branch. Best for developing new features.
 
 ```bash
-cd DevSwarm_workspace
-
-# Spawn a node for a new feature (creates branch from main if missing)
+# Spawn a node directly on 'feature/login'. Creates it from 'main' if missing.
 devswarm spawn feature/login login-dev --base main --purpose coding
+```
 
-# Spawn another node for testing the same feature concurrently
-devswarm spawn feature/login login-test --base feature/login --purpose testing
+#### Shadow Mode (--shadow)
+
+Create a temporary shadow branch (`ds-shadow/...`) based on a target branch. Best for code reviews, testing, or experimental changes without polluting the branch.
+
+```bash
+# Spawn a review node based on 'feature/login' without checking out the branch itself
+devswarm spawn feature/login login-review --shadow --purpose review
 ```
 
 ### 3. Enter Node (Tmux)
@@ -149,7 +157,7 @@ DevSwarm automatically generates and maintains a standard `.code-workspace` file
 2. **AI Context**:
    - By opening the workspace, Trae's AI can access context from all active nodes, allowing for cross-node refactoring and understanding.
 
-*(Note: VS Code users can also open the same `.code-workspace` file via **File** -> **Open Workspace from File...**)*
+_(Note: VS Code users can also open the same `.code-workspace` file via **File** -> **Open Workspace from File...**)_
 
 ### 2. Terminal Integration
 
@@ -182,7 +190,6 @@ DevSwarm can automatically attach your IDE terminal to the correct Node's Tmux s
 - When you open a terminal (`Ctrl + ~`), DevSwarm detects if the active file (passed via `CURRENT_FILE`) belongs to a specific **Node**.
 - If it does, you are automatically attached to that node's **Tmux session**.
 - If not, you are attached to a **default** session.
-
 
 ## 🏗 Architecture
 

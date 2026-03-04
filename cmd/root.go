@@ -14,7 +14,7 @@ var versionFlag bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "devswarm",
+	Use:   "ds",
 	Short: "DevSwarm - AI-native development environment manager",
 	Long: `DevSwarm provides an abstraction layer over Git worktrees and Tmux sessions,
 enabling concurrent development nodes for human and AI collaboration.`,

@@ -3,7 +3,7 @@ set -e
 
 # Configuration
 REPO="markshao/DevSwarm"
-BINARY_NAME="devswarm"
+BINARY_NAME="ds"
 INSTALL_DIR="/usr/local/bin"
 
 # Colors
@@ -66,42 +66,31 @@ tar -xzf "$TMP_DIR/$ASSET_NAME" -C "$TMP_DIR"
 
 # 3. Install binary
 echo "🚀 Installing to $INSTALL_DIR..."
-if [ -w "$INSTALL_DIR" ]; then
-    mv "$TMP_DIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
-else
-    echo "  (Needs sudo permission to move binary)"
-    # Use /dev/tty to force interactive password entry even when running via pipe
-    sudo -v < /dev/tty
-    sudo mv "$TMP_DIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
-fi
+mv "$TMP_DIR/ds" "$INSTALL_DIR/ds"
+chmod +x "$INSTALL_DIR/ds"
 
-# 4. Setup Autocompletion (Preserved from previous script)
-echo "🐚 Setting up autocompletion..."
+# 4. Setup Autocomplete
 SHELL_TYPE=$(basename "$SHELL")
 
 if [ "$SHELL_TYPE" = "zsh" ]; then
-    if ! grep -q "devswarm completion zsh" ~/.zshrc; then
-        echo "  Adding completion to ~/.zshrc"
-        echo '' >> ~/.zshrc
-        echo '# DevSwarm Autocompletion' >> ~/.zshrc
-        echo 'source <(devswarm completion zsh)' >> ~/.zshrc
-        echo -e "${GREEN}✅ Added zsh completion. Please restart your terminal or run 'source ~/.zshrc'${NC}"
+    echo "⚙️  Configuring zsh completion..."
+    if ! grep -q "ds completion zsh" ~/.zshrc; then
+        echo 'source <(ds completion zsh)' >> ~/.zshrc
+        echo "  Added completion to ~/.zshrc"
     else
-        echo "  Zsh completion already configured."
+        echo "  Completion already exists in ~/.zshrc"
     fi
 elif [ "$SHELL_TYPE" = "bash" ]; then
-    if ! grep -q "devswarm completion bash" ~/.bash_profile; then
-        echo "  Adding completion to ~/.bash_profile"
-        echo '' >> ~/.bash_profile
-        echo '# DevSwarm Autocompletion' >> ~/.bash_profile
-        echo 'source <(devswarm completion bash)' >> ~/.bash_profile
-        echo -e "${GREEN}✅ Added bash completion. Please restart your terminal.${NC}"
+    echo "⚙️  Configuring bash completion..."
+    if ! grep -q "ds completion bash" ~/.bashrc; then
+        echo 'source <(ds completion bash)' >> ~/.bashrc
+        echo "  Added completion to ~/.bashrc"
     else
-        echo "  Bash completion already configured."
+        echo "  Completion already exists in ~/.bashrc"
     fi
 else
     echo "  Shell '$SHELL_TYPE' not automatically supported for completion setup."
-    echo "  You can manually add: source <(devswarm completion $SHELL_TYPE)"
+    echo "  You can manually add: source <(ds completion $SHELL_TYPE)"
 fi
 
-echo -e "${GREEN}✨ DevSwarm installed successfully! Run 'devswarm help' to get started.${NC}"
+echo -e "${GREEN}✨ DevSwarm installed successfully! Run 'ds help' to get started.${NC}"

@@ -1,9 +1,10 @@
 version: 2
-project_name: devswarm
+project_name: ds
 
 builds:
   - env:
       - CGO_ENABLED=0
+    binary: ds
     goos:
       - linux
       - darwin
@@ -19,7 +20,7 @@ builds:
 archives:
   - format: tar.gz
     # Use a standard naming convention to make it easy for install.sh to guess the URL
-    # e.g., devswarm_Darwin_arm64.tar.gz
+    # e.g., ds_Darwin_arm64.tar.gz
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_

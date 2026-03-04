@@ -35,7 +35,7 @@ This will:
 
 1. Detect your OS and Architecture.
 2. Download the latest binary from [GitHub Releases](https://github.com/markshao/DevSwarm/releases).
-3. Install `devswarm` to `/usr/local/bin`.
+3. Install `ds` to `/usr/local/bin`.
 4. Configure autocompletion for your shell (Zsh/Bash).
 
 ## 🎮 Playground (Try it out!)
@@ -63,34 +63,34 @@ Create a DevSwarm workspace for a Git repository.
 
 ```bash
 # Automatically creates 'repo_workspace' directory (e.g. DevSwarm_workspace)
-devswarm init https://github.com/markshao/DevSwarm.git
+ds init https://github.com/markshao/DevSwarm.git
 
 # Or specify a custom directory name
-devswarm init https://github.com/markshao/DevSwarm.git my_custom_workspace
+ds init https://github.com/markshao/DevSwarm.git my_custom_workspace
 ```
 
 > **Note**: All subsequent commands must be run inside the workspace directory.
 
 ### 2. Spawn Nodes
 
-Create isolated nodes for concurrent tasks. `devswarm` supports two modes:
+Create isolated nodes for concurrent tasks. `ds` supports two modes:
 
 #### Feature Mode (Default)
 
 Directly work on a feature branch. Best for developing new features.
 
 ```bash
-# Spawn a node directly on 'feature/login'. Creates it from 'main' if missing.
-devswarm spawn feature/login login-dev --base main --purpose coding
+# Work directly on 'feature/login'. Creates it from 'main' if missing.
+ds spawn feature/login login-dev --base main --purpose coding
 ```
 
 #### Shadow Mode (--shadow)
 
-Create a temporary shadow branch (`ds-shadow/...`) based on a target branch. Best for code reviews, testing, or experimental changes without polluting the branch.
+Creates a temporary shadow branch (`ds-shadow/...`) based on the target branch. Best for code reviews, testing, or experimental changes without polluting the branch.
 
 ```bash
-# Spawn a review node based on 'feature/login' without checking out the branch itself
-devswarm spawn feature/login login-review --shadow --purpose review
+# Create a review node based on 'feature/login' without checking out the branch itself
+ds spawn feature/login login-review --shadow --purpose review
 ```
 
 ### 3. Enter Node (Tmux)
@@ -98,17 +98,17 @@ devswarm spawn feature/login login-review --shadow --purpose review
 Jump into the isolated development environment (Tmux Session) of a node.
 
 ```bash
-devswarm enter login-dev
+ds enter login-dev
 ```
 
-_You are now inside a Tmux session. The working directory is `nodes/login-dev`. Use `Ctrl+b, d` to detach._
+_You are now inside a Tmux session. The working directory is `workspaces/login-dev`. Use `Ctrl+b, d` to detach._
 
 ### 4. List Nodes
 
 Check the status of all active nodes.
 
 ```bash
-devswarm ls
+ds ls
 ```
 
 _Output:_
@@ -125,10 +125,10 @@ Merge the changes from a node (Shadow Branch) back to the main Logical Branch.
 
 ```bash
 # Squash merge and keep the node
-devswarm merge login-dev
+ds merge login-dev
 
 # Squash merge and automatically remove the node
-devswarm merge login-dev --cleanup
+ds merge login-dev --cleanup
 ```
 
 ### 6. Remove Node
@@ -136,7 +136,7 @@ devswarm merge login-dev --cleanup
 Manually remove a node and release all resources (Worktree, Branch, Session).
 
 ```bash
-devswarm rm login-test
+ds rm login-test
 ```
 
 ## 💻 IDE Integration (Trae / VS Code)
@@ -174,7 +174,7 @@ DevSwarm can automatically attach your IDE terminal to the correct Node's Tmux s
   },
   "terminal.integrated.profiles.osx": {
     "devswarm-tmux": {
-      "path": "/usr/local/bin/devswarm",
+      "path": "/usr/local/bin/ds",
       "args": ["auto-attach", "${env:CURRENT_FILE}"],
       "icon": "terminal-tmux",
       "cwd": "${fileDirname}"

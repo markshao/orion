@@ -17,11 +17,9 @@ var rmCmd = &cobra.Command{
 - Removes the git worktree
 - Deletes the shadow branch
 - Updates the state file`,
-	Args:              cobra.ExactArgs(1),
+	Args:              cobra.RangeArgs(0, 1),
 	ValidArgsFunction: CompleteNodeNames,
 	Run: func(cmd *cobra.Command, args []string) {
-		nodeName := args[0]
-
 		cwd, err := os.Getwd()
 		if err != nil {
 			fmt.Printf("Error getting current directory: %v\n", err)
@@ -32,6 +30,18 @@ var rmCmd = &cobra.Command{
 		if err != nil {
 			fmt.Printf("Failed to load workspace: %v\n", err)
 			os.Exit(1)
+		}
+
+		var nodeName string
+		if len(args) == 0 {
+			var err error
+			nodeName, err = SelectNode(wm, "remove")
+			if err != nil {
+				fmt.Printf("%v\n", err)
+				return
+			}
+		} else {
+			nodeName = args[0]
 		}
 
 		fmt.Printf("Removing node '%s'...\n", nodeName)

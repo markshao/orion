@@ -18,11 +18,9 @@ var mergeCmd = &cobra.Command{
 This operation is performed in the main repository.
 
 If --cleanup is specified, the node will be removed after a successful merge.`,
-	Args:              cobra.ExactArgs(1),
+	Args:              cobra.RangeArgs(0, 1),
 	ValidArgsFunction: CompleteNodeNames,
 	Run: func(cmd *cobra.Command, args []string) {
-		nodeName := args[0]
-
 		cwd, err := os.Getwd()
 		if err != nil {
 			fmt.Printf("Error getting current directory: %v\n", err)
@@ -33,6 +31,18 @@ If --cleanup is specified, the node will be removed after a successful merge.`,
 		if err != nil {
 			fmt.Printf("Failed to load workspace: %v\n", err)
 			os.Exit(1)
+		}
+
+		var nodeName string
+		if len(args) == 0 {
+			var err error
+			nodeName, err = SelectNode(wm, "merge")
+			if err != nil {
+				fmt.Printf("%v\n", err)
+				return
+			}
+		} else {
+			nodeName = args[0]
 		}
 
 		if err := wm.MergeNode(nodeName, cleanup); err != nil {

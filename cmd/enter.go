@@ -7,7 +7,6 @@ import (
 	"devswarm/internal/workspace"
 
 	"github.com/fatih/color"
-	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 )
 
@@ -41,37 +40,12 @@ If not, it will start a new client.`,
 		var nodeName string
 		if len(args) == 0 {
 			// Interactive mode
-			if len(wm.State.Nodes) == 0 {
-				color.Yellow("No active nodes found to enter.")
+			var err error
+			nodeName, err = SelectNode(wm, "enter")
+			if err != nil {
+				color.Yellow("%v", err)
 				return
 			}
-
-			var nodeNames []string
-			for name := range wm.State.Nodes {
-				nodeNames = append(nodeNames, name)
-			}
-
-			prompt := promptui.Select{
-				Label: "Select a node to enter",
-				Items: nodeNames,
-				Size:  10,
-				Templates: &promptui.SelectTemplates{
-					Label:    "{{ . }}?",
-					Active:   "👉 {{ . | cyan }}",
-					Inactive: "   {{ . }}",
-					Selected: "✔ Entered node: {{ . | green }}",
-				},
-			}
-
-			_, result, err := prompt.Run()
-			if err != nil {
-				if err == promptui.ErrInterrupt {
-					os.Exit(0)
-				}
-				color.Red("Prompt failed: %v", err)
-				os.Exit(1)
-			}
-			nodeName = result
 		} else {
 			nodeName = args[0]
 		}

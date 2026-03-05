@@ -6,13 +6,12 @@ import (
 
 	"devswarm/internal/workspace"
 
-	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
 )
 
 // SelectNode prompts the user to select a node from the active nodes in the workspace.
 // Returns the selected node name or an empty string if cancelled/failed.
-func SelectNode(wm *workspace.Manager, action string) (string, error) {
+func SelectNode(wm *workspace.WorkspaceManager, action string) (string, error) {
 	if len(wm.State.Nodes) == 0 {
 		return "", fmt.Errorf("no active nodes found to %s", action)
 	}

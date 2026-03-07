@@ -4,7 +4,41 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 )
+
+// InstallPostCommitHook installs a git hook to trigger DevSwarm workflow.
+func InstallPostCommitHook(repoPath string) error {
+	// The .git directory might be a file if it's a worktree, but for the main repo it should be a directory.
+	// We assume repoPath points to the root of the repo.
+	hookDir := filepath.Join(repoPath, ".git", "hooks")
+	if _, err := os.Stat(hookDir); os.IsNotExist(err) {
+		// Try to create it, though git init/clone usually does.
+		if err := os.MkdirAll(hookDir, 0755); err != nil {
+			return fmt.Errorf("failed to create hooks directory: %w", err)
+		}
+	}
+
+	hookPath := filepath.Join(hookDir, "post-commit")
+	content := `#!/bin/sh
+# DevSwarm Hook: Trigger workflow on commit
+
+# Check if we are in a DevSwarm workspace root (parent of main_repo or workspace)
+# Since this hook runs inside .git/hooks, we need to find the workspace root.
+# For simplicity in v1, we assume the hook is triggered.
+
+echo "🐝 DevSwarm: Commit detected."
+# TODO: Trigger workflow command when implemented
+# ds workflow run --event commit
+`
+
+	// Write the hook file
+	if err := os.WriteFile(hookPath, []byte(content), 0755); err != nil {
+		return fmt.Errorf("failed to write post-commit hook: %w", err)
+	}
+
+	return nil
+}
 
 // Clone clones a repository into a destination directory.
 func Clone(repoURL, destPath string) error {

@@ -21,6 +21,13 @@ const (
 	MetaDir       = ".devswarm"
 	StateFile     = "state.json"
 	ConfigFile    = "config.yaml"
+
+	// V1 Directories inside .devswarm
+	WorkflowsDir = "workflows"
+	AgentsDir    = "agents"
+	PromptsDir   = "prompts"
+	RunsDir      = "runs"
+	RuntimeDir   = "runtime"
 )
 
 // WorkspaceManager handles all high-level operations on the DevSwarm workspace.
@@ -83,6 +90,12 @@ func Init(rootPath, repoURL string) (*WorkspaceManager, error) {
 		filepath.Join(rootPath, RepoDir),
 		filepath.Join(rootPath, WorkspacesDir),
 		filepath.Join(rootPath, MetaDir),
+		// V1 Directories
+		filepath.Join(rootPath, MetaDir, WorkflowsDir),
+		filepath.Join(rootPath, MetaDir, AgentsDir),
+		filepath.Join(rootPath, MetaDir, PromptsDir),
+		filepath.Join(rootPath, MetaDir, RunsDir),
+		filepath.Join(rootPath, MetaDir, RuntimeDir),
 	}
 
 	for _, d := range dirs {
@@ -108,7 +121,122 @@ func Init(rootPath, repoURL string) (*WorkspaceManager, error) {
 		return nil, fmt.Errorf("failed to save initial state: %w", err)
 	}
 
+	// 4. Generate default V1 configuration files
+	if err := wm.generateV1Configs(); err != nil {
+		return nil, fmt.Errorf("failed to generate v1 configs: %w", err)
+	}
+
 	return wm, nil
+}
+
+func (wm *WorkspaceManager) generateV1Configs() error {
+	// 1. config.yaml
+	configContent := `version: 1
+
+workspace: workspaces
+
+git:
+  main_branch: main
+
+workflow:
+  default: default
+
+runtime:
+  artifact_dir: .devswarm/runs
+`
+	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, ConfigFile), []byte(configContent), 0644); err != nil {
+		return err
+	}
+
+	// 2. workflows/default.yaml
+	workflowContent := `name: default
+
+trigger:
+  event: commit
+
+pipeline:
+  - id: ut
+    agent: ut-agent
+    branch: shadow
+    suffix: ut
+
+  - id: cr
+    agent: cr-agent
+    depends_on: [ut]
+    branch: shadow
+    suffix: cr
+`
+	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, WorkflowsDir, "default.yaml"), []byte(workflowContent), 0644); err != nil {
+		return err
+	}
+
+	// 3. agents/ut-agent.yaml
+	utAgentContent := `name: ut-agent
+
+runtime:
+  executor: tmux
+  code-agent: qwen
+
+prompt: ut.md
+
+env:
+  - DEVSWARM_RUN_ID
+  - DEVSWARM_AGENT_BRANCH
+  - DEVSWARM_HUMAN_BRANCH
+  - DEVSWARM_ARTIFACT_DIR
+`
+	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, AgentsDir, "ut-agent.yaml"), []byte(utAgentContent), 0644); err != nil {
+		return err
+	}
+
+	// 4. agents/cr-agent.yaml
+	crAgentContent := `name: cr-agent
+
+runtime:
+  executor: tmux
+  code-agent: qwen
+
+prompt: cr.md
+
+env:
+  - DEVSWARM_RUN_ID
+  - DEVSWARM_AGENT_BRANCH
+  - DEVSWARM_HUMAN_BRANCH
+  - DEVSWARM_ARTIFACT_DIR
+`
+	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, AgentsDir, "cr-agent.yaml"), []byte(crAgentContent), 0644); err != nil {
+		return err
+	}
+
+	// 5. prompts/ut.md
+	utPromptContent := `# Unit Test Generation
+
+You are an expert software engineer.
+Your task is to generate unit tests for the changed code.
+
+Context:
+- Branch: {{.Branch}}
+- Diff: {{.Diff}}
+`
+	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, PromptsDir, "ut.md"), []byte(utPromptContent), 0644); err != nil {
+		return err
+	}
+
+	// 6. prompts/cr.md
+	crPromptContent := `# Code Review
+
+You are a senior code reviewer.
+Your task is to review the code changes and provide constructive feedback.
+
+Context:
+- Branch: {{.Branch}}
+- Diff: {{.Diff}}
+`
+	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, PromptsDir, "cr.md"), []byte(crPromptContent), 0644); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SaveState persists the current state to .devswarm/state.json

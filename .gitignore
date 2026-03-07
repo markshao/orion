@@ -35,3 +35,11 @@ go.work.sum
 playground/*
 !playground/devswarm_playground.sh
 !playground/README.md
+
+# Build artifacts
+bin/
+dist/
+
+# Test directories
+*_demo/
+*_swarm/

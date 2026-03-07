@@ -64,6 +64,14 @@ Clones the repository into a 'repo' subdirectory and sets up configuration.`,
 			fmt.Printf("Warning: Failed to create VSCode workspace file: %v\n", err)
 		}
 
+		// 5. Install Git Hooks (V1 Feature)
+		fmt.Println("Installing Git hooks...")
+		if err := git.InstallPostCommitHook(wm.State.RepoPath); err != nil {
+			fmt.Printf("Warning: Failed to install post-commit hook: %v\n", err)
+		} else {
+			fmt.Println("✔ Git post-commit hook installed.")
+		}
+
 		fmt.Println("Workspace initialized successfully!")
 		fmt.Printf("DevSwarm is ready in %s\n", absPath)
 	},

@@ -329,6 +329,7 @@ func (wm *WorkspaceManager) SpawnNode(nodeName, logicalBranch, baseBranch, purpo
 	newNode := types.Node{
 		Name:          nodeName,
 		LogicalBranch: logicalBranch,
+		BaseBranch:    baseBranch,
 		ShadowBranch:  shadowBranch,
 		WorktreePath:  worktreePath,
 		Purpose:       purpose,

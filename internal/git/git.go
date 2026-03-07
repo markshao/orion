@@ -23,13 +23,8 @@ func InstallPostCommitHook(repoPath string) error {
 	content := `#!/bin/sh
 # DevSwarm Hook: Trigger workflow on commit
 
-# Check if we are in a DevSwarm workspace root (parent of main_repo or workspace)
-# Since this hook runs inside .git/hooks, we need to find the workspace root.
-# For simplicity in v1, we assume the hook is triggered.
-
 echo "🐝 DevSwarm: Commit detected."
-# TODO: Trigger workflow command when implemented
-# ds workflow run --event commit
+ds workflow run default &
 `
 
 	// Write the hook file
@@ -94,11 +89,12 @@ func AddWorktree(repoPath, worktreePath, newBranch, startPoint string) error {
 	}
 
 	cmd.Dir = repoPath // Execute in the main repo directory
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// cmd.Stdout = os.Stdout // Suppress stdout to avoid polluting CLI output if needed, or keep for debugging
+	// cmd.Stderr = os.Stderr
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git worktree add failed: %w", err)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git worktree add failed: %s: %w", string(output), err)
 	}
 	return nil
 }

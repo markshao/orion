@@ -7,6 +7,7 @@ import "time"
 type Node struct {
 	Name          string    `json:"name"`
 	LogicalBranch string    `json:"logical_branch"`         // The user-facing branch (e.g. feature/login)
+	BaseBranch    string    `json:"base_branch,omitempty"`  // The base branch (e.g. main)
 	ShadowBranch  string    `json:"shadow_branch"`          // The actual branch for this node (e.g. devswarm/login-test/feature/login)
 	WorktreePath  string    `json:"worktree_path"`          // Absolute path to the worktree
 	TmuxSession   string    `json:"tmux_session,omitempty"` // Tmux session name, empty if not running

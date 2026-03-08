@@ -1,111 +1,41 @@
 #!/bin/bash
+
 set -e
 
-# Configuration
-REPO="markshao/DevSwarm"
-BINARY_NAME="ds"
-INSTALL_DIR="/usr/local/bin"
+REPO="bytedance/DevSwarm"
+BINARY="devswarm"
+DEST="/usr/local/bin"
 
-# Colors
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-NC='\033[0m'
-
-echo -e "${GREEN}🐝 Installing DevSwarm...${NC}"
-
-# 1. Detect OS and Arch
-OS=$(uname -s)
+# Detect OS and Arch
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 
-# Standardize OS name (Darwin/Linux)
-if [ "$OS" = "Darwin" ]; then
-    OS="Darwin"
-elif [ "$OS" = "Linux" ]; then
-    OS="Linux"
+if [ "$ARCH" == "x86_64" ]; then
+    ARCH="amd64"
+elif [ "$ARCH" == "arm64" ] || [ "$ARCH" == "aarch64" ]; then
+    ARCH="arm64"
 else
-    echo -e "${RED}Error: Unsupported OS: $OS${NC}"
+    echo "Unsupported architecture: $ARCH"
     exit 1
 fi
 
-# Standardize Arch name (x86_64/arm64)
-# Maps to Goreleaser's template:
-# amd64 -> x86_64
-# arm64 -> arm64
-if [ "$ARCH" = "x86_64" ]; then
-    ARCH="x86_64"
-elif [ "$ARCH" = "aarch64" ]; then
-    ARCH="arm64"
-elif [ "$ARCH" = "arm64" ]; then
-    ARCH="arm64"
-else
-    echo -e "${RED}Error: Unsupported Architecture: $ARCH${NC}"
-    exit 1
-fi
+echo "Detected OS: $OS, Arch: $ARCH"
 
-# 2. Construct Download URL
-# Pattern: devswarm_Darwin_arm64.tar.gz
-ASSET_NAME="${BINARY_NAME}_${OS}_${ARCH}.tar.gz"
+# Determine latest release URL
+# We assume standard GoReleaser naming convention: devswarm_{os}_{arch}
+# e.g., devswarm_darwin_arm64
+ASSET_NAME="${BINARY}_${OS}_${ARCH}"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${ASSET_NAME}"
 
-echo "⬇️  Downloading ${ASSET_NAME} from GitHub..."
-
-# Create a temporary directory
-TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
-
-# Download using curl
-if ! curl -sL -o "$TMP_DIR/$ASSET_NAME" "$DOWNLOAD_URL"; then
-    echo -e "${RED}Error: Failed to download release asset.${NC}"
-    echo "Check if the release exists: $DOWNLOAD_URL"
+echo "Downloading $BINARY from $DOWNLOAD_URL..."
+if curl -fsSL -o "$BINARY" "$DOWNLOAD_URL"; then
+    chmod +x "$BINARY"
+    echo "Installing to $DEST (requires sudo)..."
+    sudo mv "$BINARY" "$DEST/$BINARY"
+    echo "Successfully installed $BINARY to $DEST/$BINARY"
+    $BINARY --version
+else
+    echo "Failed to download binary. Please check if a release exists for your platform."
+    echo "Alternatively, you can build from source (see README)."
     exit 1
 fi
-
-# Extract
-echo "📦 Extracting..."
-tar -xzf "$TMP_DIR/$ASSET_NAME" -C "$TMP_DIR"
-
-# Rename to BINARY_NAME if needed (Goreleaser might extract as 'ds')
-if [ -f "$TMP_DIR/ds" ]; then
-    mv "$TMP_DIR/ds" "$TMP_DIR/$BINARY_NAME"
-fi
-
-# 3. Install binary
-echo "🚀 Installing to $INSTALL_DIR..."
-if [ -w "$INSTALL_DIR" ]; then
-    mv "$TMP_DIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
-    chmod +x "$INSTALL_DIR/$BINARY_NAME"
-else
-    echo "  (Needs sudo permission to move binary)"
-    # Use /dev/tty to force interactive password entry even when running via pipe
-    sudo -v < /dev/tty
-    sudo mv "$TMP_DIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
-    sudo chmod +x "$INSTALL_DIR/$BINARY_NAME"
-fi
-
-# 4. Setup Autocomplete
-SHELL_TYPE=$(basename "$SHELL")
-
-if [ "$SHELL_TYPE" = "zsh" ]; then
-    echo "⚙️  Configuring zsh completion..."
-    if ! grep -q "ds completion zsh" ~/.zshrc; then
-        echo 'source <(ds completion zsh)' >> ~/.zshrc
-        echo "  Added completion to ~/.zshrc"
-    else
-        echo "  Completion already exists in ~/.zshrc"
-    fi
-elif [ "$SHELL_TYPE" = "bash" ]; then
-    echo "⚙️  Configuring bash completion..."
-    if ! grep -q "ds completion bash" ~/.bashrc; then
-        echo 'source <(ds completion bash)' >> ~/.bashrc
-        echo "  Added completion to ~/.bashrc"
-    else
-        echo "  Completion already exists in ~/.bashrc"
-    fi
-else
-    echo "  Shell '$SHELL_TYPE' not automatically supported for completion setup."
-    echo "  You can manually add: source <(ds completion $SHELL_TYPE)"
-fi
-
-echo -e "${GREEN}✨ DevSwarm installed successfully!${NC}"
-echo -e "${GREEN}👉 Please restart your terminal or run 'source ~/.zshrc' (or ~/.bashrc) to enable autocompletion.${NC}"
-echo -e "Run 'ds help' to get started."

@@ -48,14 +48,15 @@ graph TD
 
 ### 安装
 
+**一键安装 (推荐)**
+
 ```bash
-git clone https://github.com/bytedance/DevSwarm.git
-cd DevSwarm
-go build -o bin/devswarm main.go
-export PATH=$PWD/bin:$PATH
+curl -fsSL https://raw.githubusercontent.com/bytedance/DevSwarm/main/install.sh | bash
 ```
 
-详见 [安装指南](user-guide/installation_zh-CN.md)。
+**手动安装**
+
+如需源码构建，详见 [安装指南](user-guide/installation_zh-CN.md)。
 
 ### 使用
 

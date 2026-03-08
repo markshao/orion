@@ -48,14 +48,15 @@ graph TD
 
 ### Installation
 
+**One-Click Install (Recommended)**
+
 ```bash
-git clone https://github.com/bytedance/DevSwarm.git
-cd DevSwarm
-go build -o bin/devswarm main.go
-export PATH=$PWD/bin:$PATH
+curl -fsSL https://raw.githubusercontent.com/bytedance/DevSwarm/main/install.sh | bash
 ```
 
-See [Installation Guide](user-guide/installation.md) for details.
+**Manual Install**
+
+See [Installation Guide](user-guide/installation.md) for building from source.
 
 ### Usage
 

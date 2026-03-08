@@ -15,7 +15,17 @@
 3.  **Qwen**: AI Agent 运行时。确保 `qwen` 在你的 PATH 中。
 4.  **Go**: 版本 1.21+ (源码构建需要)。
 
-## 源码构建
+## 一键安装 (推荐)
+
+使用以下命令快速安装 DevSwarm：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bytedance/DevSwarm/main/install.sh | bash
+```
+
+## 手动安装 (源码构建)
+
+如果你想从源码构建或参与项目开发：
 
 ```bash
 # 1. 克隆仓库

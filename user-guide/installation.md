@@ -15,7 +15,17 @@ Before installing DevSwarm, ensure you have the following dependencies installed
 3.  **Qwen**: The AI agent runtime. Ensure `qwen` is in your PATH.
 4.  **Go**: Version 1.21+ (Required to build from source).
 
-## Building from Source (源码构建)
+## One-Click Install (Recommended)
+
+You can install DevSwarm using the following command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bytedance/DevSwarm/main/install.sh | bash
+```
+
+## Manual Install (Build from Source)
+
+If you prefer to build from source or contribute to the project:
 
 ```bash
 # 1. Clone the repository

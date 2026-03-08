@@ -51,7 +51,7 @@ func setupTestWorkspace(t *testing.T) (*WorkspaceManager, func()) {
 		os.RemoveAll(remoteDir)
 		t.Fatalf("Clone failed: %v", err)
 	}
-	
+
 	// Configure user for local repo as well
 	exec.Command("git", "-C", wm.State.RepoPath, "config", "user.email", "test@example.com").Run()
 	exec.Command("git", "-C", wm.State.RepoPath, "config", "user.name", "Test User").Run()
@@ -147,8 +147,8 @@ func TestInitGeneratesV1Configs(t *testing.T) {
 	prompt := string(data)
 
 	requiredSubstrings := []string{
-		"Your task is to review the code changes and directly modify the codebase to add or update unit tests.",
-		"Do not output the code block in chat, just write to files.",
+		"Your task is to analyze the code changes provided below and **immediately generate and write unit tests** for them.",
+		"**DO NOT OUTPUT CODE BLOCKS IN THE CHAT.**",
 	}
 
 	for _, sub := range requiredSubstrings {
@@ -222,7 +222,7 @@ func TestMergeNode(t *testing.T) {
 	// 2. Make changes in the node's worktree
 	newFile := filepath.Join(node.WorktreePath, "new-feature.txt")
 	os.WriteFile(newFile, []byte("content"), 0644)
-	
+
 	exec.Command("git", "-C", node.WorktreePath, "add", ".").Run()
 	exec.Command("git", "-C", node.WorktreePath, "commit", "-m", "Work in node").Run()
 
@@ -236,11 +236,11 @@ func TestMergeNode(t *testing.T) {
 	// We need to check if logicalBranch has the commit.
 	// Note: SquashMerge happens in wm.State.RepoPath.
 	// But wait, SquashMerge checks out logicalBranch in RepoPath.
-	
+
 	// Let's verify file exists in RepoPath (after checkout logicalBranch)
 	// VerifyBranch checks out? No, VerifyBranch just checks existence.
 	// SquashMerge does checkout. So RepoPath should be on logicalBranch now.
-	
+
 	// Check if file exists in main repo
 	repoFile := filepath.Join(wm.State.RepoPath, "new-feature.txt")
 	if _, err := os.Stat(repoFile); os.IsNotExist(err) {
@@ -300,7 +300,7 @@ func TestFindNodeByPath(t *testing.T) {
 	// Keep the original unit test logic but maybe use the helper if we want integration test?
 	// The original test used a mock state. Let's keep it simple and just use a struct literal state like before,
 	// because creating real worktrees for path testing is slow/overkill.
-	
+
 	// Setup a mock workspace manager
 	wm := &WorkspaceManager{
 		State: &types.State{
@@ -374,7 +374,7 @@ func TestFindNodeByPath(t *testing.T) {
 		}{
 			name:      "Case mismatch on macOS (Input lower, Node mixed)",
 			inputPath: "/users/user/devswarm_ws/nodes/node1/main.go",
-			wantNode:  "node1", 
+			wantNode:  "node1",
 			wantFound: true,
 		})
 	}
@@ -385,14 +385,14 @@ func TestFindNodeByPath(t *testing.T) {
 			// Since we are using fake paths, this might fail if we don't mock them.
 			// However, FindNodeByPath logic handles errors from EvalSymlinks by falling back.
 			// So it should work for string comparison logic mostly.
-			
+
 			gotNode, _, _ := wm.FindNodeByPath(tt.inputPath)
 			if gotNode != tt.wantNode {
 				// On Linux, paths that don't exist might behave differently with Abs/Rel
 				// But let's see. If it fails, we know we need to mock FS.
 				// For now, let's allow it to fail if it must, but ideally we should only run FS tests on real FS.
 				// But this specific test block is testing string logic.
-				
+
 				// ACTUALLY: filepath.Abs works on string. EvalSymlinks fails if not exist.
 				// The code:
 				// canonicalPath, err := filepath.EvalSymlinks(absPath)
@@ -400,9 +400,52 @@ func TestFindNodeByPath(t *testing.T) {
 				// So it falls back to absPath.
 				// Then: rel, err := filepath.Rel(nodePath, canonicalPath)
 				// This should work fine for fake paths.
-				
+
 				t.Errorf("FindNodeByPath(%q) = %v, want %v", tt.inputPath, gotNode, tt.wantNode)
 			}
 		})
+	}
+}
+
+func TestAppliedRunsPersistence(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
+	defer cleanup()
+
+	nodeName := "test-node-applied"
+	logicalBranch := "feature/applied"
+
+	// 1. Spawn Node
+	// Note: SpawnNode now takes (nodeName, logicalBranch, baseBranch, label, isShadow)
+	err := wm.SpawnNode(nodeName, logicalBranch, "main", "Testing persistence", true)
+	if err != nil {
+		t.Fatalf("SpawnNode failed: %v", err)
+	}
+
+	// 2. Modify node state (add applied runs)
+	node := wm.State.Nodes[nodeName]
+	node.AppliedRuns = []string{"run-1", "run-2"}
+	wm.State.Nodes[nodeName] = node
+
+	// 3. Save State
+	if err := wm.SaveState(); err != nil {
+		t.Fatalf("Failed to save state: %v", err)
+	}
+
+	// 4. Reload Manager
+	wm2, err := NewManager(wm.RootPath)
+	if err != nil {
+		t.Fatalf("Failed to reload manager: %v", err)
+	}
+
+	loadedNode, exists := wm2.State.Nodes[nodeName]
+	if !exists {
+		t.Fatalf("Node not found after reload")
+	}
+
+	if len(loadedNode.AppliedRuns) != 2 {
+		t.Errorf("Expected 2 applied runs, got %d", len(loadedNode.AppliedRuns))
+	}
+	if loadedNode.AppliedRuns[0] != "run-1" || loadedNode.AppliedRuns[1] != "run-2" {
+		t.Errorf("AppliedRuns content mismatch: %v", loadedNode.AppliedRuns)
 	}
 }

@@ -212,8 +212,10 @@ func TestInstallPostCommitHook(t *testing.T) {
     if !strings.Contains(content, "DevSwarm Hook") {
         t.Errorf("post-commit hook missing DevSwarm marker, got: %s", content)
     }
-    if !strings.Contains(content, "ds workflow run default &") {
-        t.Errorf("post-commit hook does not contain DevSwarm workflow trigger, got: %s", content)
+
+    expected := "ds workflow run default --trigger commit &"
+    if !strings.Contains(content, expected) {
+        t.Errorf("post-commit hook does not contain expected command.\nExpected to contain: %s\nGot:\n%s", expected, content)
     }
 }
 

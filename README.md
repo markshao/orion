@@ -1,7 +1,7 @@
 # DevSwarm: AI-Native Development Environment Manager
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 **DevSwarm** is a CLI tool designed for the **Agentic DevOps** era. It virtualizes your local development environment, allowing you to collaborate with AI Agents as if they were teammates sitting next to you.
 
@@ -21,12 +21,12 @@ Instead of blocking your work, DevSwarm orchestrates a chain of **Shadow Branche
 
 ```mermaid
 graph TD
-    User((User)) -->|1. Commit| HumanNode[Human Node\n(feature/login)]
+    User((User)) -->|1. Commit| HumanNode["Human Node<br/>(feature/login)"]
     HumanNode -->|2. Trigger| Workflow{Workflow Engine}
     
     subgraph "Agentic Workflow (Local)"
-        Workflow -->|3. Spawn| AgentNode1[Agent: Unit Test\n(shadow/ut)]
-        AgentNode1 -- Fixes & Commits --> AgentNode2[Agent: Code Review\n(shadow/cr)]
+        Workflow -->|3. Spawn| AgentNode1["Agent: Unit Test<br/>(shadow/ut)"]
+        AgentNode1 -- Fixes & Commits --> AgentNode2["Agent: Code Review<br/>(shadow/cr)"]
     end
     
     AgentNode2 -->|4. Ready| FinalState(Finished Run)
@@ -105,4 +105,4 @@ ds apply login-dev
 
 ## License
 
-MIT
+Apache License 2.0

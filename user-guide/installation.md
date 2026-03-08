@@ -1,5 +1,7 @@
 # Installation Guide
 
+[English](installation.md) | [简体中文](installation_zh-CN.md)
+
 ## Prerequisites (环境要求)
 
 Before installing DevSwarm, ensure you have the following dependencies installed:

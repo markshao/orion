@@ -1,5 +1,7 @@
 # Agentic Workflow Guide
 
+[English](workflow.md) | [简体中文](workflow_zh-CN.md)
+
 DevSwarm enables **Agentic DevOps**, where AI agents work alongside you. Instead of waiting for a remote CI/CD pipeline, agents run locally in their own nodes, chaining their work on **Shadow Branches**.
 
 ## 1. How it Works

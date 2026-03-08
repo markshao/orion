@@ -1,5 +1,7 @@
 # Human Node Guide
 
+[English](human-node.md) | [简体中文](human-node_zh-CN.md)
+
 In DevSwarm, a **Human Node** is your primary workspace. It maps to a Git Worktree and a Tmux Session, providing an isolated environment for your manual coding tasks.
 
 ## 1. Initialize Workspace

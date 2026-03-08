@@ -3,6 +3,8 @@
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
+[**English**](README.md) | [**简体中文**](README_zh-CN.md)
+
 **DevSwarm** is a CLI tool designed for the **Agentic DevOps** era. It virtualizes your local development environment, allowing you to collaborate with AI Agents as if they were teammates sitting next to you.
 
 ---

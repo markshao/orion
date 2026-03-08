@@ -16,12 +16,11 @@ import (
 )
 
 var applyCmd = &cobra.Command{
-	Use:   "apply [node_name]",
-	Short: "Apply workflow changes to a node",
-	Args:  cobra.ExactArgs(1),
+	Use:               "apply [node_name]",
+	Short:             "Apply workflow changes to a node",
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: CompleteNodeNames,
 	Run: func(cmd *cobra.Command, args []string) {
-		nodeName := args[0]
-
 		cwd, err := os.Getwd()
 		if err != nil {
 			color.Red("Error getting current directory: %v", err)
@@ -38,6 +37,21 @@ var applyCmd = &cobra.Command{
 		if err != nil {
 			color.Red("Failed to load workspace: %v", err)
 			os.Exit(1)
+		}
+
+		var nodeName string
+		if len(args) > 0 {
+			nodeName = args[0]
+		} else {
+			var err error
+			nodeName, err = SelectNode(wm, "apply", true)
+			if err != nil {
+				if err.Error() == "^C" {
+					return
+				}
+				color.Red("%v", err)
+				return
+			}
 		}
 
 		node, exists := wm.State.Nodes[nodeName]

@@ -15,12 +15,11 @@ import (
 )
 
 var inspectCmd = &cobra.Command{
-	Use:   "inspect [node_name]",
-	Short: "Inspect a development node and its workflows",
-	Args:  cobra.ExactArgs(1),
+	Use:               "inspect [node_name]",
+	Short:             "Inspect a development node and its workflows",
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: CompleteNodeNames,
 	Run: func(cmd *cobra.Command, args []string) {
-		nodeName := args[0]
-
 		cwd, err := os.Getwd()
 		if err != nil {
 			color.Red("Error getting current directory: %v", err)
@@ -40,6 +39,21 @@ var inspectCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		var nodeName string
+		if len(args) > 0 {
+			nodeName = args[0]
+		} else {
+			var err error
+			nodeName, err = SelectNode(wm, "inspect", true)
+			if err != nil {
+				if err.Error() == "^C" {
+					return
+				}
+				color.Red("%v", err)
+				return
+			}
+		}
+
 		// 1. Get Node Info
 		node, exists := wm.State.Nodes[nodeName]
 		if !exists {
@@ -55,7 +69,7 @@ var inspectCmd = &cobra.Command{
 		fmt.Printf("  Created By:     %s\n", node.CreatedBy)
 		fmt.Printf("  Label:          %s\n", node.Label)
 		fmt.Printf("  Created At:     %s\n", node.CreatedAt.Format(time.RFC3339))
-		
+
 		sessionName := fmt.Sprintf("devswarm-%s", node.Name)
 		sessionStatus := "STOPPED"
 		if tmux.SessionExists(sessionName) {
@@ -65,7 +79,7 @@ var inspectCmd = &cobra.Command{
 
 		// 2. Get Associated Workflows
 		fmt.Println("\n🤖 Associated Workflows")
-		
+
 		engine := workflow.NewEngine(wm)
 		runs, err := engine.ListRuns()
 		if err != nil {
@@ -83,13 +97,13 @@ var inspectCmd = &cobra.Command{
 			} else {
 				w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 				fmt.Fprintln(w, "  RUN ID\tWORKFLOW\tSTATUS\tTRIGGER\tSTARTED\tDURATION")
-				
+
 				for _, run := range nodeRuns {
 					duration := time.Since(run.StartTime).Round(time.Second).String()
 					if !run.EndTime.IsZero() {
 						duration = run.EndTime.Sub(run.StartTime).Round(time.Second).String()
 					}
-					
+
 					triggerDisplay := run.Trigger
 					if run.Trigger == "commit" && len(run.TriggerData) >= 7 {
 						triggerDisplay = fmt.Sprintf("commit(%s)", run.TriggerData[:7])
@@ -107,7 +121,7 @@ var inspectCmd = &cobra.Command{
 				w.Flush()
 			}
 		}
-		
+
 		fmt.Println("\n💡 Actions")
 		fmt.Printf("  To merge workflow changes: ds apply %s\n", nodeName)
 		fmt.Printf("  To enter this node:        ds enter %s\n", nodeName)

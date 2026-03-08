@@ -292,11 +292,6 @@ var enterWorkflowCmd = &cobra.Command{
 	Short: "Enter an agent node within a workflow run",
 	Args:  cobra.MaximumNArgs(2),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		// Only autocomplete run_id for now
-		if len(args) > 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
 		cwd, err := os.Getwd()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
@@ -311,17 +306,41 @@ var enterWorkflowCmd = &cobra.Command{
 		}
 
 		engine := workflow.NewEngine(wm)
-		runs, err := engine.ListRuns()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
+
+		// Case 1: Autocomplete Run ID
+		if len(args) == 0 {
+			runs, err := engine.ListRuns()
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+
+			var completions []string
+			for _, run := range runs {
+				desc := fmt.Sprintf("%s - %s (%s)", run.Workflow, run.Status, run.StartTime.Format("01-02 15:04"))
+				completions = append(completions, fmt.Sprintf("%s\t%s", run.ID, desc))
+			}
+			return completions, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		var completions []string
-		for _, run := range runs {
-			desc := fmt.Sprintf("%s - %s (%s)", run.Workflow, run.Status, run.StartTime.Format("01-02 15:04"))
-			completions = append(completions, fmt.Sprintf("%s\t%s", run.ID, desc))
+		// Case 2: Autocomplete Step ID (Cascaded)
+		if len(args) == 1 {
+			runID := args[0]
+			run, err := engine.GetRun(runID)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+
+			var completions []string
+			for _, s := range run.Steps {
+				if s.NodeName != "" {
+					desc := fmt.Sprintf("%s - %s", s.Agent, s.Status)
+					completions = append(completions, fmt.Sprintf("%s\t%s", s.ID, desc))
+				}
+			}
+			return completions, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completions, cobra.ShellCompDirectiveNoFileComp
+
+		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cwd, err := os.Getwd()

@@ -1,4 +1,4 @@
-# Orion: AI-Native Development Environment Manager
+# <img src="assets/icon.svg" alt="Orion Logo" width="40" height="40" align="top"/> Orion: AI-Native Development Environment Manager
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -15,11 +15,12 @@
 
 ## 🌟 Core Concept: Agentic DevOps
 
-Traditional DevOps relies on remote CI/CD pipelines—slow, stateless, and disconnected from your IDE. 
+Traditional DevOps relies on remote CI/CD pipelines—slow, stateless, and disconnected from your IDE.
 
 **Orion brings the pipeline to your local machine.** It introduces the concept of **Nodes**:
-*   **Human Node**: Your dedicated workspace (Git Worktree + Tmux Session).
-*   **Agentic Node**: An ephemeral workspace where AI Agents running in the background can write code, run tests, and fix bugs *concurrently* with you.
+
+- **Human Node**: Your dedicated workspace (Git Worktree + Tmux Session).
+- **Agentic Node**: An ephemeral workspace where AI Agents running in the background can write code, run tests, and fix bugs _concurrently_ with you.
 
 ### The "Chain of Branch" Workflow
 
@@ -29,14 +30,14 @@ Instead of blocking your work, Orion orchestrates a chain of **Shadow Branches**
 graph TD
     User((User)) -->|1. Commit| HumanNode["Human Node<br/>(feature/login)"]
     HumanNode -->|2. Trigger| Workflow{Workflow Engine}
-    
+
     subgraph "Agentic Workflow (Local)"
         Workflow -->|3. Spawn| AgentNode1["Agent: Unit Test<br/>(shadow/ut)"]
         AgentNode1 -- Fixes & Commits --> AgentNode2["Agent: Code Review<br/>(shadow/cr)"]
     end
-    
+
     AgentNode2 -->|4. Ready| FinalState(Finished Run)
-    
+
     User -->|5. orion apply| FinalState
     FinalState -- Merge Back --> HumanNode
 ```
@@ -65,12 +66,14 @@ See [Installation Guide](user-guide/installation.md) for building from source.
 ### Usage
 
 #### 1. Initialize
+
 ```bash
 mkdir myproject_swarm && cd myproject_swarm
 orion init https://github.com/user/repo.git
 ```
 
 #### 2. Start Coding (Human Node)
+
 ```bash
 # Create a node for your feature
 orion spawn feature/login login-dev
@@ -80,6 +83,7 @@ orion enter login-dev
 ```
 
 #### 3. Agent Collaboration
+
 When you commit code in `login-dev`, a workflow starts automatically.
 
 ```bash

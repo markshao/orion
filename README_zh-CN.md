@@ -1,4 +1,4 @@
-# Orion: AI 原生开发环境管理器
+# <img src="assets/icon.svg" alt="Orion Logo" width="40" height="40" align="top"/> Orion: AI 原生开发环境管理器
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)

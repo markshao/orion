@@ -4,17 +4,25 @@ import (
 	"fmt"
 	"os"
 
-	"devswarm/internal/log"
+	"orion/internal/log"
 
 	"github.com/spf13/cobra"
 )
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "ds",
-	Short: "DevSwarm - AI-native development environment manager",
-	Long: `DevSwarm provides an abstraction layer over Git worktrees and Tmux sessions,
-enabling concurrent development nodes for human and AI collaboration.`,
+	Use:   "orion",
+	Short: "Orion - AI-native development environment manager",
+	Long: `
+   ___  ____  ___  ____  _  _ 
+  / _ \(  _ \/ __)(  _ \( \( )
+ ( (_) ))   /\__ \ )(_) ))  ( 
+  \___/(__\_)(___/(____/(_)\_)
+
+Orion - Navigation System for AI Agents.
+
+Orion orchestrates agents across your codebase, providing an abstraction layer 
+over Git worktrees and Tmux sessions for seamless human-AI collaboration.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// Initialize logger
 		if err := log.Init(); err != nil {

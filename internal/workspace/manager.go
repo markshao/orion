@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"devswarm/internal/git"
-	"devswarm/internal/tmux"
-	"devswarm/internal/types"
-	"devswarm/internal/vscode"
+	"orion/internal/git"
+	"orion/internal/tmux"
+	"orion/internal/types"
+	"orion/internal/vscode"
 
 	"gopkg.in/yaml.v3"
 )
@@ -20,11 +20,11 @@ import (
 const (
 	RepoDir       = "main_repo"  // Was "repo"
 	WorkspacesDir = "workspaces" // Was NodesDir
-	MetaDir       = ".devswarm"
+	MetaDir       = ".orion"
 	StateFile     = "state.json"
 	ConfigFile    = "config.yaml"
 
-	// V1 Directories inside .devswarm
+	// V1 Directories inside .orion
 	WorkflowsDir = "workflows"
 	AgentsDir    = "agents"
 	PromptsDir   = "prompts"
@@ -32,19 +32,19 @@ const (
 	RuntimeDir   = "runtime"
 )
 
-// WorkspaceManager handles all high-level operations on the DevSwarm workspace.
+// WorkspaceManager handles all high-level operations on the Orion workspace.
 type WorkspaceManager struct {
 	RootPath string
 	State    *types.State
 }
 
 // NewManager creates a manager for an existing workspace.
-// It checks if the current directory is a valid DevSwarm workspace root.
+// It checks if the current directory is a valid Orion workspace root.
 func NewManager(rootPath string) (*WorkspaceManager, error) {
-	// Strict check: .devswarm MUST exist in the current directory
+	// Strict check: .orion MUST exist in the current directory
 	metaPath := filepath.Join(rootPath, MetaDir)
 	if _, err := os.Stat(metaPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("not a devswarm workspace: %s not found in %s", MetaDir, rootPath)
+		return nil, fmt.Errorf("not a orion workspace: %s not found in %s", MetaDir, rootPath)
 	}
 
 	wm := &WorkspaceManager{
@@ -59,7 +59,7 @@ func NewManager(rootPath string) (*WorkspaceManager, error) {
 	return wm, nil
 }
 
-// FindWorkspaceRoot traverses up from startPath looking for .devswarm directory.
+// FindWorkspaceRoot traverses up from startPath looking for .orion directory.
 func FindWorkspaceRoot(startPath string) (string, error) {
 	current := startPath
 	for {
@@ -69,7 +69,7 @@ func FindWorkspaceRoot(startPath string) (string, error) {
 
 		parent := filepath.Dir(current)
 		if parent == current {
-			return "", fmt.Errorf("not a devswarm workspace (or any of the parent directories): %s not found", MetaDir)
+			return "", fmt.Errorf("not a orion workspace (or any of the parent directories): %s not found", MetaDir)
 		}
 		current = parent
 	}
@@ -87,7 +87,7 @@ func (wm *WorkspaceManager) SyncVSCodeWorkspace() error {
 	return vscode.UpdateWorkspaceFile(wm.RootPath, RepoDir, WorkspacesDir, nodes)
 }
 
-// Init creates a new DevSwarm workspace structure.
+// Init creates a new Orion workspace structure.
 // It creates the directories but does NOT clone the repo (that's the caller's job via GitManager).
 func Init(rootPath, repoURL string) (*WorkspaceManager, error) {
 	// 1. Create directory structure
@@ -134,7 +134,7 @@ func Init(rootPath, repoURL string) (*WorkspaceManager, error) {
 	return wm, nil
 }
 
-// GetConfig loads the .devswarm/config.yaml
+// GetConfig loads the .orion/config.yaml
 func (wm *WorkspaceManager) GetConfig() (*types.Config, error) {
 	configPath := filepath.Join(wm.RootPath, MetaDir, ConfigFile)
 	data, err := os.ReadFile(configPath)
@@ -162,7 +162,7 @@ workflow:
   default: default
 
 runtime:
-  artifact_dir: .devswarm/runs
+  artifact_dir: .orion/runs
 `
 	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, ConfigFile), []byte(configContent), 0644); err != nil {
 		return err
@@ -273,7 +273,7 @@ Context:
 	return nil
 }
 
-// SaveState persists the current state to .devswarm/state.json
+// SaveState persists the current state to .orion/state.json
 func (wm *WorkspaceManager) SaveState() error {
 	statePath := filepath.Join(wm.RootPath, MetaDir, StateFile)
 
@@ -288,7 +288,7 @@ func (wm *WorkspaceManager) SaveState() error {
 	return encoder.Encode(wm.State)
 }
 
-// LoadState loads the state from .devswarm/state.json
+// LoadState loads the state from .orion/state.json
 func (wm *WorkspaceManager) LoadState() error {
 	statePath := filepath.Join(wm.RootPath, MetaDir, StateFile)
 
@@ -338,8 +338,8 @@ func (wm *WorkspaceManager) SpawnNode(nodeName, logicalBranch, baseBranch, label
 
 	if isShadow {
 		// Shadow Mode: Create a temporary branch based on logicalBranch
-		// Naming: ds-shadow/<node_name>/<logical_branch>
-		shadowBranch = fmt.Sprintf("ds-shadow/%s/%s", nodeName, logicalBranch)
+		// Naming: orion-shadow/<node_name>/<logical_branch>
+		shadowBranch = fmt.Sprintf("orion-shadow/%s/%s", nodeName, logicalBranch)
 		// We use logicalBranch as the base for the shadow branch
 		if err := git.AddWorktree(wm.State.RepoPath, worktreePath, shadowBranch, logicalBranch); err != nil {
 			return fmt.Errorf("failed to create shadow worktree: %w", err)
@@ -395,7 +395,7 @@ func (wm *WorkspaceManager) EnterNode(nodeName string) error {
 		return fmt.Errorf("node '%s' does not exist", nodeName)
 	}
 
-	sessionName := fmt.Sprintf("devswarm-%s", nodeName)
+	sessionName := fmt.Sprintf("orion-%s", nodeName)
 
 	// Check if we are already inside tmux
 	if tmux.IsInsideTmux() {
@@ -422,7 +422,7 @@ func (wm *WorkspaceManager) RemoveNode(nodeName string) error {
 	}
 
 	// 1. Kill Tmux Session
-	sessionName := fmt.Sprintf("devswarm-%s", nodeName)
+	sessionName := fmt.Sprintf("orion-%s", nodeName)
 	if err := tmux.KillSession(sessionName); err != nil {
 		fmt.Printf("Warning: Failed to kill tmux session: %v\n", err)
 	}
@@ -469,7 +469,7 @@ func (wm *WorkspaceManager) MergeNode(nodeName string, cleanup bool) error {
 	} else {
 		fmt.Printf("Merging node '%s' (shadow: %s) into logical branch '%s'...\n", nodeName, node.ShadowBranch, node.LogicalBranch)
 
-		commitMsg := fmt.Sprintf("Squash merge from DevSwarm node '%s'", nodeName)
+		commitMsg := fmt.Sprintf("Squash merge from Orion node '%s'", nodeName)
 		if err := git.SquashMerge(wm.State.RepoPath, node.LogicalBranch, node.ShadowBranch, commitMsg); err != nil {
 			return fmt.Errorf("merge failed: %w", err)
 		}

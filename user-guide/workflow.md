@@ -2,7 +2,7 @@
 
 [English](workflow.md) | [简体中文](workflow_zh-CN.md)
 
-DevSwarm enables **Agentic DevOps**, where AI agents work alongside you. Instead of waiting for a remote CI/CD pipeline, agents run locally in their own nodes, chaining their work on **Shadow Branches**.
+Orion enables **Agentic DevOps**, where AI agents work alongside you. Instead of waiting for a remote CI/CD pipeline, agents run locally in their own nodes, chaining their work on **Shadow Branches**.
 
 ## 1. How it Works
 
@@ -15,7 +15,7 @@ DevSwarm enables **Agentic DevOps**, where AI agents work alongside you. Instead
 
 ## 2. Configuration
 
-Workflows are defined in `.devswarm/workflows/default.yaml`.
+Workflows are defined in `.orion/workflows/default.yaml`.
 
 ```yaml
 name: default
@@ -24,7 +24,7 @@ trigger:
 
 pipeline:
   - id: ut
-    agent: ut-agent # Refers to .devswarm/agents/ut-agent.yaml
+    agent: ut-agent # Refers to .orion/agents/ut-agent.yaml
     suffix: ut
 
   - id: cr
@@ -39,7 +39,7 @@ pipeline:
 View all active and past workflow runs:
 
 ```bash
-ds workflow ls
+orion workflow ls
 # Output:
 # RUN ID        STATUS   TRIGGER          BASE BRANCH
 # run-abc1234   success  commit(a1b2c)    feature/login
@@ -49,29 +49,29 @@ ds workflow ls
 See detailed steps and status:
 
 ```bash
-ds workflow inspect run-abc1234
+orion workflow inspect run-abc1234
 ```
 
 ## 4. Applying Changes (The Loop)
 
 Once an agent has finished its work (e.g., fixed a bug), you need to bring those changes back to your working branch.
 
-**Do NOT use `git merge` manually.** Use `ds apply`:
+**Do NOT use `git merge` manually.** Use `orion apply`:
 
 ```bash
 # 1. Check your node status
-ds inspect login-node
+orion inspect login-node
 
 # 2. Apply the workflow result
-ds apply login-node
+orion apply login-node
 ```
 
-You will be prompted to select which workflow run to apply. DevSwarm will then merge the final Shadow Branch into your Human Node's worktree.
+You will be prompted to select which workflow run to apply. Orion will then merge the final Shadow Branch into your Human Node's worktree.
 
 ## 5. Manual Trigger
 
 You can also trigger a workflow manually without committing:
 
 ```bash
-ds workflow run default
+orion workflow run default
 ```

@@ -1,7 +1,7 @@
 package version
 
 var (
-	// Version is the current version of DevSwarm.
+	// Version is the current version of Orion.
 	// This should be set via ldflags during build.
 	Version = "v0.0.9"
 

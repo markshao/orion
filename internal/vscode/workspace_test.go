@@ -10,7 +10,7 @@ import (
 // TestUpdateWorkspaceFile verifies that the generated .code-workspace file
 // contains the repo folder and all node folders with the expected paths.
 func TestUpdateWorkspaceFile(t *testing.T) {
-	rootDir, err := os.MkdirTemp("", "devswarm-vscode-ws-test")
+	rootDir, err := os.MkdirTemp("", "orion-vscode-ws-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}

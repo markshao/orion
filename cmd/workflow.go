@@ -6,8 +6,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"devswarm/internal/workflow"
-	"devswarm/internal/workspace"
+	"orion/internal/workflow"
+	"orion/internal/workspace"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -15,7 +15,7 @@ import (
 
 var workflowCmd = &cobra.Command{
 	Use:   "workflow",
-	Short: "Manage DevSwarm workflows",
+	Short: "Manage Orion workflows",
 	Long:  `Trigger, list, and inspect automated workflows.`,
 }
 
@@ -40,7 +40,7 @@ var runWorkflowCmd = &cobra.Command{
 		// Find workspace root
 		rootPath, err := workspace.FindWorkspaceRoot(cwd)
 		if err != nil {
-			color.Red("Not in a DevSwarm workspace: %v", err)
+			color.Red("Not in a Orion workspace: %v", err)
 			os.Exit(1)
 		}
 
@@ -58,9 +58,9 @@ var runWorkflowCmd = &cobra.Command{
 			baseBranch = node.ShadowBranch
 
 			// Recursion Guard: Do not allow workflows to be triggered from within a workflow run (Shadow Branch)
-			// Shadow branches follow the pattern: devswarm/run-<id>/<step>
-			// We check if the branch name starts with "devswarm/run-"
-			if len(baseBranch) > 13 && baseBranch[:13] == "devswarm/run-" {
+			// Shadow branches follow the pattern: orion/run-<id>/<step>
+			// We check if the branch name starts with "orion/run-"
+			if len(baseBranch) > 13 && baseBranch[:13] == "orion/run-" {
 				color.Red("Recursion detected: Cannot trigger a workflow from within an active workflow run agent.")
 				color.Yellow("This prevents infinite loops when agents commit code.")
 				os.Exit(0) // Exit successfully to avoid error spam in hooks
@@ -75,7 +75,7 @@ var runWorkflowCmd = &cobra.Command{
 		}
 
 		color.Green("🚀 Workflow '%s' started with ID: %s", wfName, run.ID)
-		fmt.Printf("Run 'ds workflow inspect %s' to check progress.\n", run.ID)
+		fmt.Printf("Run 'orion workflow inspect %s' to check progress.\n", run.ID)
 	},
 }
 
@@ -92,7 +92,7 @@ var lsWorkflowCmd = &cobra.Command{
 		// Find workspace root
 		rootPath, err := workspace.FindWorkspaceRoot(cwd)
 		if err != nil {
-			color.Red("Not in a DevSwarm workspace: %v", err)
+			color.Red("Not in a Orion workspace: %v", err)
 			os.Exit(1)
 		}
 
@@ -207,7 +207,7 @@ var inspectWorkflowCmd = &cobra.Command{
 		// Find workspace root
 		rootPath, err := workspace.FindWorkspaceRoot(cwd)
 		if err != nil {
-			color.Red("Not in a DevSwarm workspace: %v", err)
+			color.Red("Not in a Orion workspace: %v", err)
 			os.Exit(1)
 		}
 
@@ -351,7 +351,7 @@ var enterWorkflowCmd = &cobra.Command{
 
 		rootPath, err := workspace.FindWorkspaceRoot(cwd)
 		if err != nil {
-			color.Red("Not in a DevSwarm workspace: %v", err)
+			color.Red("Not in a Orion workspace: %v", err)
 			os.Exit(1)
 		}
 

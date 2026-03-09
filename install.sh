@@ -2,8 +2,8 @@
 
 set -e
 
-REPO="bytedance/DevSwarm"
-BINARY="devswarm"
+REPO="bytedance/Orion"
+BINARY="orion"
 DEST="/usr/local/bin"
 
 # Detect OS and Arch
@@ -22,8 +22,8 @@ fi
 echo "Detected OS: $OS, Arch: $ARCH"
 
 # Determine latest release URL
-# We assume standard GoReleaser naming convention: devswarm_{os}_{arch}
-# e.g., devswarm_darwin_arm64
+# We assume standard GoReleaser naming convention: orion_{os}_{arch}
+# e.g., orion_darwin_arm64
 ASSET_NAME="${BINARY}_${OS}_${ARCH}"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${ASSET_NAME}"
 

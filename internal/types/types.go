@@ -2,13 +2,13 @@ package types
 
 import "time"
 
-// Node represents a development unit in DevSwarm.
+// Node represents a development unit in Orion.
 // A Node can exist without a Tmux session (e.g. just created, or session killed).
 type Node struct {
 	Name          string    `json:"name"`
 	LogicalBranch string    `json:"logical_branch"`         // The user-facing branch (e.g. feature/login)
 	BaseBranch    string    `json:"base_branch,omitempty"`  // The base branch (e.g. main)
-	ShadowBranch  string    `json:"shadow_branch"`          // The actual branch for this node (e.g. devswarm/login-test/feature/login)
+	ShadowBranch  string    `json:"shadow_branch"`          // The actual branch for this node (e.g. orion/login-test/feature/login)
 	WorktreePath  string    `json:"worktree_path"`          // Absolute path to the worktree
 	TmuxSession   string    `json:"tmux_session,omitempty"` // Tmux session name, empty if not running
 	Label         string    `json:"label,omitempty"`        // User-defined tag (e.g. "review", "test")
@@ -17,8 +17,8 @@ type Node struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
-// State represents the global state of the DevSwarm workspace.
-// This is persisted to .devswarm/state.json
+// State represents the global state of the Orion workspace.
+// This is persisted to .orion/state.json
 type State struct {
 	RepoURL  string          `json:"repo_url"`
 	RepoPath string          `json:"repo_path"` // Absolute path to the main repo (source of truth)
@@ -27,7 +27,7 @@ type State struct {
 
 // --- V1 Configuration Types ---
 
-// Config represents the .devswarm/config.yaml structure
+// Config represents the .orion/config.yaml structure
 type Config struct {
 	Version   int               `yaml:"version"`
 	Workspace string            `yaml:"workspace"`

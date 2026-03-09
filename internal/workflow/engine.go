@@ -12,10 +12,10 @@ import (
 	"text/template"
 	"time"
 
-	"devswarm/internal/git"
-	"devswarm/internal/tmux"
-	"devswarm/internal/types"
-	"devswarm/internal/workspace"
+	"orion/internal/git"
+	"orion/internal/tmux"
+	"orion/internal/types"
+	"orion/internal/workspace"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
@@ -140,8 +140,8 @@ func (e *Engine) executeStep(run *Run, step *StepStatus, stepDef *types.Pipeline
 	}
 
 	// 2. Define Shadow Branch
-	// Naming: devswarm/<run-id>/<step-id>
-	shadowBranch := fmt.Sprintf("devswarm/%s/%s", run.ID, step.ID)
+	// Naming: orion/<run-id>/<step-id>
+	shadowBranch := fmt.Sprintf("orion/%s/%s", run.ID, step.ID)
 	step.ShadowBranch = shadowBranch
 
 	// 3. Spawn Node (Worktree + Shadow Branch + Tmux)
@@ -178,7 +178,7 @@ func (e *Engine) executeStep(run *Run, step *StepStatus, stepDef *types.Pipeline
 		userName = "ds_agent"
 	}
 	if userEmail == "" {
-		userEmail = "ds_agent@devswarm.local"
+		userEmail = "ds_agent@orion.local"
 	}
 
 	_ = git.SetConfig(node.WorktreePath, "user.name", userName)
@@ -253,7 +253,7 @@ exit $EXIT_CODE
 	_ = os.Remove(filepath.Join(node.WorktreePath, ".agent_exit_code"))
 
 	// We use the existing session created by spawnAgentNode
-	sessionName := fmt.Sprintf("devswarm-%s", step.NodeName)
+	sessionName := fmt.Sprintf("orion-%s", step.NodeName)
 	if err := tmux.SendKeys(sessionName, "./run_agent.sh"); err != nil {
 		return fmt.Errorf("failed to send command to tmux: %w", err)
 	}
@@ -296,7 +296,7 @@ func (e *Engine) resolveBaseBranch(run *Run, stepDef *types.PipelineStep) (strin
 }
 
 func (e *Engine) spawnAgentNode(nodeName, shadowBranch, baseBranch, createdBy string) (*types.Node, error) {
-	// Agent nodes are stored in .devswarm/agent-nodes/ to keep them hidden from the main workspace list
+	// Agent nodes are stored in .orion/agent-nodes/ to keep them hidden from the main workspace list
 	agentNodesDir := filepath.Join(e.wm.RootPath, workspace.MetaDir, "agent-nodes")
 	if err := os.MkdirAll(agentNodesDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create agent nodes directory: %w", err)
@@ -312,7 +312,7 @@ func (e *Engine) spawnAgentNode(nodeName, shadowBranch, baseBranch, createdBy st
 	}
 
 	// 2. Create Tmux Session
-	sessionName := fmt.Sprintf("devswarm-%s", nodeName)
+	sessionName := fmt.Sprintf("orion-%s", nodeName)
 	if err := tmux.NewSession(sessionName, worktreePath); err != nil {
 		return nil, fmt.Errorf("failed to create tmux session: %w", err)
 	}

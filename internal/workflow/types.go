@@ -14,7 +14,7 @@ const (
 )
 
 // Run represents a single execution of a workflow.
-// This is persisted to .devswarm/runs/<run-id>/status.json
+// This is persisted to .orion/runs/<run-id>/status.json
 type Run struct {
 	ID        string       `json:"id"`
 	Workflow  string       `json:"workflow"`

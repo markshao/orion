@@ -1,6 +1,6 @@
 .PHONY: build clean run
 
-APP_NAME := devswarm
+APP_NAME := orion
 BUILD_DIR := bin
 
 all: build

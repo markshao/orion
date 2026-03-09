@@ -4,7 +4,7 @@
 
 ## 环境要求
 
-在安装 DevSwarm 之前，请确保已安装以下依赖：
+在安装 Orion 之前，请确保已安装以下依赖：
 
 1.  **Git**: 版本 2.20+ (需要支持 `git worktree`)。
 2.  **Tmux**: 用于会话管理。
@@ -17,10 +17,10 @@
 
 ## 一键安装 (推荐)
 
-使用以下命令快速安装 DevSwarm：
+使用以下命令快速安装 Orion：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bytedance/DevSwarm/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bytedance/Orion/main/install.sh | bash
 ```
 
 ## 手动安装 (源码构建)
@@ -29,11 +29,11 @@ curl -fsSL https://raw.githubusercontent.com/bytedance/DevSwarm/main/install.sh 
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/bytedance/DevSwarm.git
-cd DevSwarm
+git clone https://github.com/bytedance/Orion.git
+cd Orion
 
 # 2. 编译二进制文件
-go build -o bin/devswarm main.go
+go build -o bin/orion main.go
 
 # 3. 添加到 PATH (可选)
 export PATH=$PWD/bin:$PATH
@@ -44,8 +44,8 @@ export PATH=$PWD/bin:$PATH
 运行以下命令验证安装是否成功：
 
 ```bash
-devswarm --version
-# 应输出: DevSwarm version v1.0.0
+orion --version
+# 应输出: Orion version v1.0.0
 ```
 
 ## 下一步

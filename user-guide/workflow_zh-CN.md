@@ -2,7 +2,7 @@
 
 [English](workflow.md) | [简体中文](workflow_zh-CN.md)
 
-DevSwarm 开启了 **Agentic DevOps** 模式，AI Agents 与你并肩工作。Agents 不在远程 CI/CD 流水线中等待，而是在本地独立的节点中运行，通过 **Shadow Branch (影子分支)** 链接它们的工作。
+Orion 开启了 **Agentic DevOps** 模式，AI Agents 与你并肩工作。Agents 不在远程 CI/CD 流水线中等待，而是在本地独立的节点中运行，通过 **Shadow Branch (影子分支)** 链接它们的工作。
 
 ## 1. 工作原理
 
@@ -15,7 +15,7 @@ DevSwarm 开启了 **Agentic DevOps** 模式，AI Agents 与你并肩工作。Ag
 
 ## 2. 配置
 
-工作流定义在 `.devswarm/workflows/default.yaml` 中。
+工作流定义在 `.orion/workflows/default.yaml` 中。
 
 ```yaml
 name: default
@@ -24,7 +24,7 @@ trigger:
 
 pipeline:
   - id: ut
-    agent: ut-agent # 引用 .devswarm/agents/ut-agent.yaml
+    agent: ut-agent # 引用 .orion/agents/ut-agent.yaml
     suffix: ut
 
   - id: cr
@@ -39,7 +39,7 @@ pipeline:
 查看所有活跃和历史工作流运行：
 
 ```bash
-ds workflow ls
+orion workflow ls
 # 输出:
 # RUN ID        STATUS   TRIGGER          BASE BRANCH
 # run-abc1234   success  commit(a1b2c)    feature/login
@@ -49,29 +49,29 @@ ds workflow ls
 查看详细步骤和状态：
 
 ```bash
-ds workflow inspect run-abc1234
+orion workflow inspect run-abc1234
 ```
 
 ## 4. 应用更改 (闭环)
 
 一旦 Agent 完成工作（例如修复了 Bug），你需要将这些更改带回你的工作分支。
 
-**不要手动使用 `git merge`。** 请使用 `ds apply`：
+**不要手动使用 `git merge`。** 请使用 `orion apply`：
 
 ```bash
 # 1. 检查节点状态
-ds inspect login-node
+orion inspect login-node
 
 # 2. 应用工作流结果
-ds apply login-node
+orion apply login-node
 ```
 
-系统会提示你选择要应用的工作流运行。DevSwarm 随后会将最终的 Shadow Branch 合并到你的 Human Node 工作区中。
+系统会提示你选择要应用的工作流运行。Orion 随后会将最终的 Shadow Branch 合并到你的 Human Node 工作区中。
 
 ## 5. 手动触发
 
 你也可以在不提交代码的情况下手动触发工作流：
 
 ```bash
-ds workflow run default
+orion workflow run default
 ```

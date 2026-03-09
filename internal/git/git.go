@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// InstallPostCommitHook installs a git hook to trigger DevSwarm workflow.
+// InstallPostCommitHook installs a git hook to trigger Orion workflow.
 func InstallPostCommitHook(repoPath string) error {
 	// The .git directory might be a file if it's a worktree, but for the main repo it should be a directory.
 	// We assume repoPath points to the root of the repo.
@@ -23,10 +23,10 @@ func InstallPostCommitHook(repoPath string) error {
 
 	hookPath := filepath.Join(hookDir, "post-commit")
 	content := `#!/bin/sh
-# DevSwarm Hook: Trigger workflow on commit
+# Orion Hook: Trigger workflow on commit
 
-echo "🐝 DevSwarm: Commit detected."
-ds workflow run default --trigger commit &
+echo "🐝 Orion: Commit detected."
+orion workflow run default --trigger commit &
 `
 
 	// Write the hook file

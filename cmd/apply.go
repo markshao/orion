@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"devswarm/internal/git"
-	"devswarm/internal/workflow"
-	"devswarm/internal/workspace"
+	"orion/internal/git"
+	"orion/internal/workflow"
+	"orion/internal/workspace"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -29,7 +29,7 @@ var applyCmd = &cobra.Command{
 
 		rootPath, err := workspace.FindWorkspaceRoot(cwd)
 		if err != nil {
-			color.Red("Not in a DevSwarm workspace: %v", err)
+			color.Red("Not in a Orion workspace: %v", err)
 			os.Exit(1)
 		}
 

@@ -6,9 +6,9 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"devswarm/internal/tmux"
-	"devswarm/internal/workflow"
-	"devswarm/internal/workspace"
+	"orion/internal/tmux"
+	"orion/internal/workflow"
+	"orion/internal/workspace"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -29,7 +29,7 @@ var inspectCmd = &cobra.Command{
 		// Find workspace root
 		rootPath, err := workspace.FindWorkspaceRoot(cwd)
 		if err != nil {
-			color.Red("Not in a DevSwarm workspace: %v", err)
+			color.Red("Not in a Orion workspace: %v", err)
 			os.Exit(1)
 		}
 
@@ -70,7 +70,7 @@ var inspectCmd = &cobra.Command{
 		fmt.Printf("  Label:          %s\n", node.Label)
 		fmt.Printf("  Created At:     %s\n", node.CreatedAt.Format(time.RFC3339))
 
-		sessionName := fmt.Sprintf("devswarm-%s", node.Name)
+		sessionName := fmt.Sprintf("orion-%s", node.Name)
 		sessionStatus := "STOPPED"
 		if tmux.SessionExists(sessionName) {
 			sessionStatus = "RUNNING"
@@ -123,8 +123,8 @@ var inspectCmd = &cobra.Command{
 		}
 
 		fmt.Println("\n💡 Actions")
-		fmt.Printf("  To merge workflow changes: ds apply %s\n", nodeName)
-		fmt.Printf("  To enter this node:        ds enter %s\n", nodeName)
+		fmt.Printf("  To merge workflow changes: orion apply %s\n", nodeName)
+		fmt.Printf("  To enter this node:        orion enter %s\n", nodeName)
 	},
 }
 

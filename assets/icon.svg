@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Orion's Belt -->
+  <circle cx="30" cy="70" r="6" fill="#FFD700" />
+  <circle cx="50" cy="50" r="6" fill="#FFD700" />
+  <circle cx="70" cy="30" r="6" fill="#FFD700" />
+  
+  <!-- Connection Line -->
+  <line x1="30" y1="70" x2="70" y2="30" stroke="#FFD700" stroke-width="2" stroke-dasharray="4" />
+  
+  <!-- Outer Ring (Optional, for logo feel) -->
+  <circle cx="50" cy="50" r="45" fill="none" stroke="#4A90E2" stroke-width="2" />
+  
+  <text x="50" y="90" font-family="Arial" font-weight="bold" font-size="10" text-anchor="middle" fill="#4A90E2">ORION</text>
+</svg>

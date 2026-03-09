@@ -33,7 +33,7 @@ go.work.sum
 
 # Playground generated files
 playground/*
-!playground/devswarm_playground.sh
+!playground/orion_playground.sh
 !playground/README.md
 
 # Build artifacts
@@ -44,8 +44,8 @@ dist/
 *_demo/
 *_swarm/
 
-# Local DevSwarm state and config
-.devswarm/
+# Local Orion state and config
+.orion/
 
 # VS Code workspace
-DevSwarm.code-workspace
+Orion.code-workspace

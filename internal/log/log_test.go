@@ -11,7 +11,7 @@ import (
 // and that log lines are appended to the expected file.
 func TestInitAndLogging(t *testing.T) {
 	// Use a temporary HOME so we don't touch the real user's home directory.
-	tmpHome, err := os.MkdirTemp("", "devswarm-log-test")
+	tmpHome, err := os.MkdirTemp("", "orion-log-test")
 	if err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestInitAndLogging(t *testing.T) {
 	Info("info message: %s", "hello")
 	Error("error message: %s", "boom")
 
-	logPath := filepath.Join(tmpHome, ".devswarm.log")
+	logPath := filepath.Join(tmpHome, ".orion.log")
 	data, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatalf("failed to read log file: %v", err)

@@ -1,11 +1,15 @@
-# DevSwarm: AI 原生开发环境管理器
+# <img src="assets/icon.svg" alt="Orion Logo" width="40" height="40" align="top"/> Orion: AI 原生开发环境管理器
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 [**English**](README.md) | [**简体中文**](README_zh-CN.md)
 
-**DevSwarm** 是专为 **Agentic DevOps** 时代设计的 CLI 工具。它虚拟化了你的本地开发环境，让你能够与 AI Agents 像队友一样协同工作。
+**Orion** 是专为 **Agentic DevOps** 时代设计的 CLI 工具。它虚拟化了你的本地开发环境，让你能够与 AI Agents 像队友一样协同工作。
+
+## 🌌 为什么叫 "Orion"?
+
+**Orion (猎户座)** 是 AI Agents 的导航系统。这个名字象征着 **Orion 如何在你的代码库中编排 Agents**，像星座指引航海者一样，引导它们完成复杂的开发任务。
 
 ---
 
@@ -13,13 +17,13 @@
 
 传统的 DevOps 依赖于远程 CI/CD 流水线——这通常是缓慢、无状态且与你的 IDE 断连的。
 
-**DevSwarm 将流水线带回了本地。** 它引入了 **Node (节点)** 的概念：
+**Orion 将流水线带回了本地。** 它引入了 **Node (节点)** 的概念：
 *   **Human Node (人类节点)**: 你的专属工作区 (Git Worktree + Tmux Session)。
 *   **Agentic Node (智能体节点)**: 一个临时的后台工作区，AI Agents 可以在其中与你 *并发* 地编写代码、运行测试和修复 Bug。
 
 ### "Chain of Branch" 工作流
 
-DevSwarm 不会阻塞你的工作，而是编排一条 **Shadow Branch (影子分支)** 链：
+Orion 不会阻塞你的工作，而是编排一条 **Shadow Branch (影子分支)** 链：
 
 ```mermaid
 graph TD
@@ -33,14 +37,14 @@ graph TD
     
     AgentNode2 -->|4. Ready| FinalState(Finished Run)
     
-    User -->|5. ds apply| FinalState
+    User -->|5. orion apply| FinalState
     FinalState -- Merge Back --> HumanNode
 ```
 
 1.  **你编码**: 在 Human Node 中工作。
 2.  **Agent 响应**: 每次提交都会自动触发 Agent Node。
 3.  **并行执行**: 当你继续编码时，Agent 1 编写测试，Agent 2 审查代码。
-4.  **闭环**: 当你准备好时，使用 `ds apply` 将 Agent 的成果合并回你的分支。
+4.  **闭环**: 当你准备好时，使用 `orion apply` 将 Agent 的成果合并回你的分支。
 
 ---
 
@@ -51,7 +55,7 @@ graph TD
 **一键安装 (推荐)**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bytedance/DevSwarm/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bytedance/Orion/main/install.sh | bash
 ```
 
 **手动安装**
@@ -63,16 +67,16 @@ curl -fsSL https://raw.githubusercontent.com/bytedance/DevSwarm/main/install.sh 
 #### 1. 初始化
 ```bash
 mkdir myproject_swarm && cd myproject_swarm
-ds init https://github.com/user/repo.git
+orion init https://github.com/user/repo.git
 ```
 
 #### 2. 开始编码 (Human Node)
 ```bash
 # 为你的特性创建一个节点
-ds spawn feature/login login-dev
+orion spawn feature/login login-dev
 
 # 进入隔离环境
-ds enter login-dev
+orion enter login-dev
 ```
 
 #### 3. Agent 协作
@@ -80,13 +84,13 @@ ds enter login-dev
 
 ```bash
 # 查看 Agent 状态
-ds workflow ls
+orion workflow ls
 
 # 检查 Agent 做了什么
-ds workflow inspect <run-id>
+orion workflow inspect <run-id>
 
 # 将 Agent 的更改变更回你的节点
-ds apply login-dev
+orion apply login-dev
 ```
 
 ---

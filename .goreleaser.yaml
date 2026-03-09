@@ -13,9 +13,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X devswarm/internal/version.Version={{.Version}}
-      - -X devswarm/internal/version.Commit={{.Commit}}
-      - -X devswarm/internal/version.Date={{.Date}}
+      - -X orion/internal/version.Version={{.Version}}
+      - -X orion/internal/version.Commit={{.Commit}}
+      - -X orion/internal/version.Date={{.Date}}
 
 archives:
   - format: tar.gz

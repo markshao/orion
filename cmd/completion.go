@@ -3,7 +3,7 @@ package cmd
 import (
 	"os"
 
-	"devswarm/internal/workspace"
+	"orion/internal/workspace"
 
 	"github.com/spf13/cobra"
 )

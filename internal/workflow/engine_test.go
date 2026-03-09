@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"devswarm/internal/types"
-	"devswarm/internal/workspace"
+	"orion/internal/types"
+	"orion/internal/workspace"
 
 	"gopkg.in/yaml.v3"
 )

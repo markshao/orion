@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"devswarm/internal/workspace"
+	"orion/internal/workspace"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -50,7 +50,7 @@ If not, it will start a new client.`,
 			nodeName = args[0]
 			// Check if it is an agent node
 			if node, exists := wm.State.Nodes[nodeName]; exists && node.CreatedBy != "user" {
-				color.Red("Node '%s' is an Agent Node. Please use `ds workflow enter` to access it.", nodeName)
+				color.Red("Node '%s' is an Agent Node. Please use `orion workflow enter` to access it.", nodeName)
 				os.Exit(1)
 			}
 		}

@@ -4,7 +4,7 @@
 
 ## Prerequisites (环境要求)
 
-Before installing DevSwarm, ensure you have the following dependencies installed:
+Before installing Orion, ensure you have the following dependencies installed:
 
 1.  **Git**: Version 2.20+ (Required for `git worktree` support).
 2.  **Tmux**: Required for session management.
@@ -17,10 +17,10 @@ Before installing DevSwarm, ensure you have the following dependencies installed
 
 ## One-Click Install (Recommended)
 
-You can install DevSwarm using the following command:
+You can install Orion using the following command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bytedance/DevSwarm/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bytedance/Orion/main/install.sh | bash
 ```
 
 ## Manual Install (Build from Source)
@@ -29,11 +29,11 @@ If you prefer to build from source or contribute to the project:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/bytedance/DevSwarm.git
-cd DevSwarm
+git clone https://github.com/bytedance/Orion.git
+cd Orion
 
 # 2. Build the binary
-go build -o bin/devswarm main.go
+go build -o bin/orion main.go
 
 # 3. Add to PATH (Optional)
 export PATH=$PWD/bin:$PATH
@@ -44,8 +44,8 @@ export PATH=$PWD/bin:$PATH
 Run the following command to verify the installation:
 
 ```bash
-devswarm --version
-# Should output: DevSwarm version v1.0.0
+orion --version
+# Should output: Orion version v1.0.0
 ```
 
 ## Next Steps

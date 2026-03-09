@@ -12,7 +12,7 @@ import (
 func setupTestRepo(t *testing.T) (string, func()) {
     t.Helper()
 
-    dir, err := os.MkdirTemp("", "devswarm-git-test")
+    dir, err := os.MkdirTemp("", "orion-git-test")
     if err != nil {
         t.Fatalf("failed to create temp dir: %v", err)
     }
@@ -81,7 +81,7 @@ func TestAddWorktree(t *testing.T) {
     repoPath, cleanup := setupTestRepo(t)
     defer cleanup()
 
-    worktreeDir, err := os.MkdirTemp("", "devswarm-worktree-test")
+    worktreeDir, err := os.MkdirTemp("", "orion-worktree-test")
     if err != nil {
         t.Fatalf("failed to create temp worktree dir: %v", err)
     }
@@ -123,7 +123,7 @@ func TestRemoveWorktree(t *testing.T) {
     repoPath, cleanup := setupTestRepo(t)
     defer cleanup()
 
-    worktreeDir, err := os.MkdirTemp("", "devswarm-worktree-test")
+    worktreeDir, err := os.MkdirTemp("", "orion-worktree-test")
     if err != nil {
         t.Fatalf("failed to create temp worktree dir: %v", err)
     }
@@ -209,11 +209,11 @@ func TestInstallPostCommitHook(t *testing.T) {
     }
 
     content := string(data)
-    if !strings.Contains(content, "DevSwarm Hook") {
-        t.Errorf("post-commit hook missing DevSwarm marker, got: %s", content)
+    if !strings.Contains(content, "Orion Hook") {
+        t.Errorf("post-commit hook missing Orion marker, got: %s", content)
     }
 
-    expected := "ds workflow run default --trigger commit &"
+    expected := "orion workflow run default --trigger commit &"
     if !strings.Contains(content, expected) {
         t.Errorf("post-commit hook does not contain expected command.\nExpected to contain: %s\nGot:\n%s", expected, content)
     }

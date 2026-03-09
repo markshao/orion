@@ -1,8 +1,8 @@
 package workspace
 
 import (
-	"devswarm/internal/git"
-	"devswarm/internal/types"
+	"orion/internal/git"
+	"orion/internal/types"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,13 +16,13 @@ func setupTestWorkspace(t *testing.T) (*WorkspaceManager, func()) {
 	t.Helper()
 
 	// 1. Create root dir for workspace
-	rootDir, err := os.MkdirTemp("", "devswarm-ws-test")
+	rootDir, err := os.MkdirTemp("", "orion-ws-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
 
 	// 2. Initialize a separate git repo to serve as "remote"
-	remoteDir, err := os.MkdirTemp("", "devswarm-remote-test")
+	remoteDir, err := os.MkdirTemp("", "orion-remote-test")
 	if err != nil {
 		os.RemoveAll(rootDir)
 		t.Fatalf("failed to create temp remote dir: %v", err)
@@ -37,7 +37,7 @@ func setupTestWorkspace(t *testing.T) (*WorkspaceManager, func()) {
 	exec.Command("git", "-C", remoteDir, "add", ".").Run()
 	exec.Command("git", "-C", remoteDir, "commit", "-m", "Initial commit").Run()
 
-	// 3. Run Init (creates .devswarm, etc.)
+	// 3. Run Init (creates .orion, etc.)
 	wm, err := Init(rootDir, remoteDir)
 	if err != nil {
 		os.RemoveAll(rootDir)
@@ -70,7 +70,7 @@ func TestInit(t *testing.T) {
 
 	// Verify directory structure
 	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir)); os.IsNotExist(err) {
-		t.Errorf(".devswarm directory not created")
+		t.Errorf(".orion directory not created")
 	}
 	if _, err := os.Stat(filepath.Join(wm.RootPath, RepoDir)); os.IsNotExist(err) {
 		t.Errorf("repo directory not created")
@@ -307,11 +307,11 @@ func TestFindNodeByPath(t *testing.T) {
 			Nodes: map[string]types.Node{
 				"node1": {
 					Name:         "node1",
-					WorktreePath: "/Users/user/devswarm_ws/nodes/node1",
+					WorktreePath: "/Users/user/orion_ws/nodes/node1",
 				},
 				"node2": {
 					Name:         "node2",
-					WorktreePath: "/Users/user/devswarm_ws/nodes/node2",
+					WorktreePath: "/Users/user/orion_ws/nodes/node2",
 				},
 			},
 		},
@@ -325,25 +325,25 @@ func TestFindNodeByPath(t *testing.T) {
 	}{
 		{
 			name:      "Exact match file inside node",
-			inputPath: "/Users/user/devswarm_ws/nodes/node1/main.go",
+			inputPath: "/Users/user/orion_ws/nodes/node1/main.go",
 			wantNode:  "node1",
 			wantFound: true,
 		},
 		{
 			name:      "Exact match directory inside node",
-			inputPath: "/Users/user/devswarm_ws/nodes/node1/src",
+			inputPath: "/Users/user/orion_ws/nodes/node1/src",
 			wantNode:  "node1",
 			wantFound: true,
 		},
 		{
 			name:      "Path outside nodes",
-			inputPath: "/Users/user/devswarm_ws/repo/main.go",
+			inputPath: "/Users/user/orion_ws/repo/main.go",
 			wantNode:  "",
 			wantFound: false,
 		},
 		{
 			name:      "Partial prefix match (should fail)",
-			inputPath: "/Users/user/devswarm_ws/nodes/node1-suffix/main.go",
+			inputPath: "/Users/user/orion_ws/nodes/node1-suffix/main.go",
 			wantNode:  "",
 			wantFound: false,
 		},
@@ -353,7 +353,7 @@ func TestFindNodeByPath(t *testing.T) {
 	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 		wm.State.Nodes["node_lower"] = types.Node{
 			Name:         "node_lower",
-			WorktreePath: "/users/user/devswarm_ws/nodes/node_lower",
+			WorktreePath: "/users/user/orion_ws/nodes/node_lower",
 		}
 
 		tests = append(tests, struct {
@@ -363,7 +363,7 @@ func TestFindNodeByPath(t *testing.T) {
 			wantFound bool
 		}{
 			name:      "Case mismatch on macOS (Input mixed, Node lower)",
-			inputPath: "/Users/User/DevSwarm_ws/Nodes/node_lower/main.go",
+			inputPath: "/Users/User/Orion_ws/Nodes/node_lower/main.go",
 			wantNode:  "node_lower",
 			wantFound: true,
 		}, struct {
@@ -373,7 +373,7 @@ func TestFindNodeByPath(t *testing.T) {
 			wantFound bool
 		}{
 			name:      "Case mismatch on macOS (Input lower, Node mixed)",
-			inputPath: "/users/user/devswarm_ws/nodes/node1/main.go",
+			inputPath: "/users/user/orion_ws/nodes/node1/main.go",
 			wantNode:  "node1",
 			wantFound: true,
 		})

@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"devswarm/internal/workflow"
-	"devswarm/internal/workspace"
+	"orion/internal/workflow"
+	"orion/internal/workspace"
 
 	"github.com/manifoldco/promptui"
 )

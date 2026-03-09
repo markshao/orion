@@ -6,9 +6,9 @@ import (
 
 	"path/filepath"
 
-	"devswarm/internal/log"
-	"devswarm/internal/tmux"
-	"devswarm/internal/workspace"
+	"orion/internal/log"
+	"orion/internal/tmux"
+	"orion/internal/workspace"
 
 	"github.com/spf13/cobra"
 )
@@ -17,7 +17,7 @@ var autoAttachCmd = &cobra.Command{
 	Use:   "auto-attach [file_path]",
 	Short: "Automatically attach to the node's tmux session based on file path",
 	Long: `Intended for IDE integration (e.g. VS Code).
-Checks if the given file path (or current directory) belongs to a DevSwarm node.
+Checks if the given file path (or current directory) belongs to a Orion node.
 If yes, attaches to that node's tmux session.
 If no, attaches to a default tmux session named 'default'.`,
 	Args: cobra.MaximumNArgs(1),
@@ -64,8 +64,8 @@ If no, attaches to a default tmux session named 'default'.`,
 		// We start searching from the absolute path upwards
 		wsRoot, err := workspace.FindWorkspaceRoot(absPath)
 		if err != nil {
-			// Not inside a DevSwarm workspace -> Fallback
-			log.Info("auto-attach: Not inside DevSwarm workspace (path: %s)", absPath)
+			// Not inside a Orion workspace -> Fallback
+			log.Info("auto-attach: Not inside Orion workspace (path: %s)", absPath)
 			fallbackToDefaultSession()
 			return
 		}

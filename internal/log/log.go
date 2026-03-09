@@ -9,14 +9,14 @@ import (
 
 var logFile *os.File
 
-// Init initializes the global logger to ~/.devswarm.log
+// Init initializes the global logger to ~/.orion.log
 func Init() error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
 
-	logPath := filepath.Join(home, ".devswarm.log")
+	logPath := filepath.Join(home, ".orion.log")
 	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err

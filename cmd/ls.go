@@ -6,8 +6,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"devswarm/internal/tmux"
-	"devswarm/internal/workspace"
+	"orion/internal/tmux"
+	"orion/internal/workspace"
 
 	"github.com/spf13/cobra"
 )
@@ -40,7 +40,7 @@ var lsCmd = &cobra.Command{
 			}
 
 			sessionStatus := "STOPPED"
-			sessionName := fmt.Sprintf("devswarm-%s", name)
+			sessionName := fmt.Sprintf("orion-%s", name)
 			if tmux.SessionExists(sessionName) {
 				sessionStatus = "RUNNING"
 			}

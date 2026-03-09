@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"devswarm/internal/git"
-	"devswarm/internal/workspace"
+	"orion/internal/git"
+	"orion/internal/workspace"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -14,8 +14,8 @@ import (
 
 var initCmd = &cobra.Command{
 	Use:   "init [repo_url] [dir_name]",
-	Short: "Initialize a new DevSwarm workspace",
-	Long: `Creates a new directory with the necessary structure for DevSwarm.
+	Short: "Initialize a new Orion workspace",
+	Long: `Creates a new directory with the necessary structure for Orion.
 Clones the repository into a 'repo' subdirectory and sets up configuration.`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -31,7 +31,7 @@ Clones the repository into a 'repo' subdirectory and sets up configuration.`,
 			dirName = fmt.Sprintf("%s_swarm", projectName)
 		}
 
-		fmt.Printf("Initializing DevSwarm for %s in %s...\n", repoURL, dirName)
+		fmt.Printf("Initializing Orion for %s in %s...\n", repoURL, dirName)
 
 		// 1. Create directory structure
 		absPath, err := filepath.Abs(dirName)
@@ -109,7 +109,7 @@ Clones the repository into a 'repo' subdirectory and sets up configuration.`,
 		}
 
 		fmt.Println("Workspace initialized successfully!")
-		fmt.Printf("DevSwarm is ready in %s\n", absPath)
+		fmt.Printf("Orion is ready in %s\n", absPath)
 	},
 }
 

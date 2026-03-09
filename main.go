@@ -1,6 +1,6 @@
 package main
 
-import "devswarm/cmd"
+import "orion/cmd"
 
 func main() {
 	cmd.Execute()

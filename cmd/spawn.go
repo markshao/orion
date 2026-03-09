@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"devswarm/internal/workspace"
+	"orion/internal/workspace"
 
 	"github.com/spf13/cobra"
 )
@@ -30,19 +30,19 @@ Modes:
    Best for developing new features.
 
    Example:
-   $ devswarm spawn feature/login login-dev
+   $ orion spawn feature/login login-dev
    # Creates node 'login-dev' working directly on branch 'feature/login'
 
-   $ devswarm spawn feature/new-idea my-node --base main
+   $ orion spawn feature/new-idea my-node --base main
    # Creates 'feature/new-idea' from 'main' and works on it
 
 2. Shadow Mode (--shadow):
-   Creates a temporary shadow branch (ds-shadow/...) based on the branch_name.
+   Creates a temporary shadow branch (orion-shadow/...) based on the branch_name.
    Best for code reviews, testing, or experimental changes without polluting the branch.
 
    Example:
-   $ devswarm spawn feature/login review-node --shadow
-   # Creates node 'review-node' on branch 'ds-shadow/review-node/feature/login'
+   $ orion spawn feature/login review-node --shadow
+   # Creates node 'review-node' on branch 'orion-shadow/review-node/feature/login'
 
 If the branch_name does not exist, provide --base to create it from a base branch.`,
 	Args: cobra.ExactArgs(2),
@@ -76,7 +76,7 @@ If the branch_name does not exist, provide --base to create it from a base branc
 		}
 
 		fmt.Printf("✅ Node '%s' created successfully!\n", nodeName)
-		fmt.Printf("Run 'devswarm enter %s' to start coding.\n", nodeName)
+		fmt.Printf("Run 'orion enter %s' to start coding.\n", nodeName)
 	},
 }
 

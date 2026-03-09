@@ -95,6 +95,23 @@ orion apply login-dev
 
 ---
 
+## ✨ 自动补全
+
+安装脚本会尝试自动配置 Zsh 和 Bash 的自动补全。
+如果需要手动设置：
+
+**Zsh**
+```bash
+echo "source <(orion completion zsh)" >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Bash**
+```bash
+echo "source <(orion completion bash)" >> ~/.bashrc
+source ~/.bashrc
+```
+
 ## 📚 文档
 
 - [**安装指南**](user-guide/installation_zh-CN.md): 环境要求与设置。

@@ -41,6 +41,47 @@ if curl -fsSL -o "$TMP_DIR/$ASSET_NAME" "$DOWNLOAD_URL"; then
         chmod +x "$DEST/$BINARY"
         echo "Successfully installed $BINARY to $DEST/$BINARY"
         $BINARY --version
+
+        # Autocompletion setup
+        echo "Setting up autocompletion..."
+        SHELL_TYPE=$(basename "$SHELL")
+        
+        if [ "$SHELL_TYPE" == "zsh" ]; then
+             # Zsh completion
+            COMPLETION_FILE="${HOME}/.orion_completion.zsh"
+            $BINARY completion zsh > "$COMPLETION_FILE"
+            
+            if ! grep -q "source $COMPLETION_FILE" "${HOME}/.zshrc"; then
+                echo "" >> "${HOME}/.zshrc"
+                echo "# Orion autocompletion" >> "${HOME}/.zshrc"
+                echo "source $COMPLETION_FILE" >> "${HOME}/.zshrc"
+                echo "Added Zsh completion to ~/.zshrc. Please restart your terminal."
+            else
+                echo "Zsh completion already configured."
+            fi
+            
+        elif [ "$SHELL_TYPE" == "bash" ]; then
+             # Bash completion
+            COMPLETION_FILE="${HOME}/.orion_completion.bash"
+            $BINARY completion bash > "$COMPLETION_FILE"
+            
+            RC_FILE="${HOME}/.bashrc"
+            if [ -f "${HOME}/.bash_profile" ]; then
+                RC_FILE="${HOME}/.bash_profile"
+            fi
+            
+            if ! grep -q "source $COMPLETION_FILE" "$RC_FILE"; then
+                echo "" >> "$RC_FILE"
+                echo "# Orion autocompletion" >> "$RC_FILE"
+                echo "source $COMPLETION_FILE" >> "$RC_FILE"
+                echo "Added Bash completion to $RC_FILE. Please restart your terminal."
+            else
+                echo "Bash completion already configured."
+            fi
+        else
+            echo "Skipping autocompletion: unsupported shell '$SHELL_TYPE'. Manual setup required."
+            echo "Run '$BINARY completion <shell>' to generate script."
+        fi
     else
         echo "Error: Binary '$BINARY' not found in archive."
         ls -l "$TMP_DIR"

@@ -99,6 +99,25 @@ orion apply login-dev
 
 ---
 
+## ✨ Autocompletion
+
+The install script attempts to configure autocompletion for Zsh and Bash automatically.
+If you need to set it up manually:
+
+**Zsh**
+
+```bash
+echo "source <(orion completion zsh)" >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Bash**
+
+```bash
+echo "source <(orion completion bash)" >> ~/.bashrc
+source ~/.bashrc
+```
+
 ## 📚 Documentation
 
 - [**Installation Guide**](user-guide/installation.md): Requirements and setup.

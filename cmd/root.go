@@ -39,8 +39,8 @@ over Git worktrees and Tmux sessions for seamless human-AI collaboration.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	// Hide the completion command from help
-	rootCmd.CompletionOptions.HiddenDefaultCmd = true
+	// Show the completion command in help
+	rootCmd.CompletionOptions.HiddenDefaultCmd = false
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

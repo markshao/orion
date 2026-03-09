@@ -43,3 +43,9 @@ dist/
 # Test directories
 *_demo/
 *_swarm/
+
+# Local DevSwarm state and config
+.devswarm/
+
+# VS Code workspace
+DevSwarm.code-workspace

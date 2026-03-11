@@ -1,123 +1,152 @@
 # Agentic Workflow Guide
 
-Orion's core power lies in its ability to orchestrate AI Agents to work alongside you. This guide covers how to define workflows, create custom agents, and write effective prompts.
-
-## 1. Workflows (`.orion/workflows/*.yaml`)
-
-A Workflow defines a pipeline of tasks to be executed by agents. Workflows are triggered by events (like a commit) or manually.
-
-### Structure
-
-Create a YAML file in `.orion/workflows/` (e.g., `ci-check.yaml`):
-
-```yaml
-name: ci-check-workflow
-
-# Trigger configuration
-trigger:
-  event: commit      # Options: 'commit' (auto on commit), 'manual' (CLI only)
-  # branch: feature/* # Optional: Only trigger on specific branches
-
-# The pipeline of steps
-pipeline:
-  - id: unit-test        # Unique ID for this step
-    agent: ut-agent      # Reference to an agent defined in .orion/agents/
-    suffix: ut           # Suffix for the shadow branch (e.g., orion/run-id/ut)
-    
-  - id: code-review      # Second step
-    agent: cr-agent
-    depends_on: [unit-test] # This step waits for 'unit-test' to complete
-    suffix: cr
-```
-
-### Key Concepts
-*   **Pipeline**: An ordered list of steps.
-*   **Shadow Branch**: Each step runs in its own isolated Git branch (`orion/<run-id>/<step-id>`). Agents can modify code here without affecting your main work.
-*   **Dependencies**: Use `depends_on` to create sequential chains. If a dependency fails, subsequent steps are skipped.
+Orion enables **Agentic DevOps** by orchestrating AI agents to work concurrently with you in isolated environments. This guide details how to configure custom workflows, define specialized agents, and leverage the "Chain of Branch" architecture.
 
 ---
 
-## 2. Custom Agents (`.orion/agents/*.yaml`)
+## 1. Core Concepts
 
-An Agent defines **who** performs the task and **how** they are configured.
+### The "Chain of Branch" Model
+Orion treats every agent task as a Git branch operation.
 
-### Structure
+1.  **Human Node**: You work on a feature branch (e.g., `feature/login`).
+2.  **Shadow Branch**: When a workflow starts, Orion creates a temporary branch off your current work (e.g., `orion/run-123/ut`).
+3.  **Agent Execution**: The agent works in this shadow branch—writing code, running tests, or fixing bugs.
+4.  **Chaining**: Multiple agents can be chained. Agent B can start from Agent A's shadow branch (`depends_on`).
+5.  **Merge Back**: You review the final result and merge the agent's work back into your feature branch using `orion apply`.
 
-Create a YAML file in `.orion/agents/` (e.g., `ut-agent.yaml`):
+### Artifacts vs. Code
+*   **Code**: Changes to source files (`*.go`, `*.py`) are committed to the shadow branch.
+*   **Artifacts**: Non-code outputs (reports, logs, binaries) are written to a special `ArtifactDir` and are **not** committed to Git, but are persisted in Orion's run storage.
+
+---
+
+## 2. Configuring Custom Workflows
+
+Workflows are defined in `.orion/workflows/*.yaml`. They describe the *pipeline* of tasks.
+
+**Example: Unit Test -> Code Review Pipeline**
+Create `.orion/workflows/ut-cr.yaml`:
+
+```yaml
+name: ut-cr-workflow
+
+# Trigger Configuration
+trigger:
+  event: manual      # Options: 'manual' (CLI), 'commit' (Auto)
+  # branch: feature/* # Optional: Only trigger on specific branches
+
+pipeline:
+  # Step 1: Unit Test Generation
+  - id: ut-gen           # Unique ID for this step
+    agent: ut-agent      # Refers to .orion/agents/ut-agent.yaml
+    suffix: ut           # Shadow branch suffix: orion/<run-id>/ut
+
+  # Step 2: Code Review
+  - id: code-review
+    agent: cr-agent      # Refers to .orion/agents/cr-agent.yaml
+    depends_on: [ut-gen] # CR starts from the result of 'ut-gen'
+    suffix: cr           # Shadow branch suffix: orion/<run-id>/cr
+```
+
+### Dependency Logic
+*   If `depends_on` is set, the step's shadow branch is created from the dependency's shadow branch.
+*   If `depends_on` is empty (default), the step starts from the **Base Branch** (your current code).
+
+---
+
+## 3. Configuring Custom Agents
+
+Agents are the "workers". They are defined in `.orion/agents/*.yaml`.
+
+**Example: A Unit Test Agent**
+Create `.orion/agents/ut-agent.yaml`:
 
 ```yaml
 name: ut-agent
 
 runtime:
-  # The backend provider to use.
-  # Built-in defaults: 'traecli' (recommended), 'qwen'
-  provider: traecli 
+  # The AI Provider to use (configured in .orion/config.yaml)
+  # Built-ins: 'traecli', 'qwen'
+  provider: qwen
   
-  # Optional: Override the command execution template
-  # command: 'my-custom-cli "{{.Prompt}}" --flag'
+  # Optional: Specific model parameters
+  # model: qwen-max
+  # params:
+  #   temperature: 0.7
 
-# The prompt file to use for instructions
+# The instruction file for the agent
 prompt: ut-gen.md
 ```
 
-### Providers
-Orion supports multiple providers. The default configuration usually points `traecli` and `qwen` to the `traecli` binary, but you can customize this in `.orion/config.yaml`.
+### Runtime Providers
+Orion delegates execution to providers. By default:
+*   `traecli`: Uses the `traecli` binary with python mode (`-py`).
+*   `qwen`: Uses `traecli` binary with auto-yes mode (`-y`).
+*   **Custom**: You can define your own providers in `.orion/config.yaml` with custom command templates (e.g., `docker run ...`).
 
 ---
 
-## 3. Prompts (`.orion/prompts/*.md`)
+## 4. Writing Effective Prompts
 
-Prompts are the instructions given to the AI Agent. Orion supports **Prompt Injection** and **Variable Replacement**.
+Prompts (`.orion/prompts/*.md`) tell the agent *what* to do. Orion injects context variables at runtime.
 
-### Structure
-
-Create a Markdown file in `.orion/prompts/` (e.g., `ut-gen.md`):
+**Example: `ut-gen.md`**
 
 ```markdown
-# Unit Test Generation Task
+# Unit Test Generation
 
 ## Objective
-Analyze the code changes in the current branch and generate unit tests.
+Generate comprehensive unit tests for the modified code in this branch.
 
-## Context
-- **Artifacts**: Please write your test report to `{{.ArtifactDir}}/report.md`.
-- **Coverage**: Save coverage data to `{{.ArtifactDir}}/coverage.json`.
+## Context Variables
+Orion automatically replaces these:
+- `{{.Branch}}`: Current shadow branch name.
+- `{{.ArtifactDir}}`: Absolute path to store reports/logs.
+- `{{.CommitID}}`: Current commit hash.
 
 ## Instructions
-1. Identify modified functions in the `src/` directory.
-2. Generate Go test cases in `_test.go` files.
-3. Run the tests and ensure they pass.
+1.  **Analyze**: Look at the `git diff` to understand changes.
+2.  **Generate**: Write Go test cases in `*_test.go` files.
+3.  **Report**: Write a summary of coverage to `{{.ArtifactDir}}/coverage_report.md`.
+
+## Rules
+- Do NOT modify the original source code, only add tests.
+- Ensure all tests compile and run.
 ```
-
-### Available Variables
-Orion automatically injects these variables into your prompt at runtime:
-
-*   `{{.ArtifactDir}}`: The absolute path to a dedicated directory for this step's outputs. **Always use this for non-code outputs** (reports, logs, binaries).
-*   `{{.Branch}}`: The current shadow branch name.
-*   `{{.CommitID}}`: The hash of the commit being processed.
-*   `{{.UserPrompt}}`: (Internal) The content of your prompt file is injected here into the base system prompt.
 
 ---
 
-## 4. Artifacts
+## 5. Artifact Management
 
-Artifacts are files generated by agents that are *not* part of the source code (e.g., test reports, compiled binaries, analysis summaries).
+When an agent needs to produce output that isn't code (e.g., a security scan report, a compiled binary, or a log file), it **must** write to `{{.ArtifactDir}}`.
 
-*   **Writing**: In your prompt, tell the agent to write to `{{.ArtifactDir}}/filename`.
-*   **Reading**: You can view artifacts using the CLI:
+### Why?
+*   **Persistence**: Artifacts are stored outside the Git worktree (`.orion/runs/...`), so they survive even if the shadow branch is deleted.
+*   **Visibility**: You can easily inspect them via CLI without switching branches.
+
+### Usage
+1.  **Agent**: Writes to `{{.ArtifactDir}}/my-report.txt`.
+2.  **User**: Inspects via:
     ```bash
     orion workflow artifacts ls <run-id>
+    ```
+    Output:
+    ```
+    📂 Step: code-review
+      - my-report.txt  (/absolute/path/to/report.txt)
     ```
 
 ---
 
-## 5. Execution Model
+## 6. Advanced: Environment & Auth
 
-When a workflow runs:
-1.  **Isolation**: Orion creates a new **Shadow Node** (Git Worktree + Tmux Session) for each step.
-2.  **Context**: The node checks out the code from the base branch (or the result of the previous step).
-3.  **Authentication**: Orion automatically injects your SSH (`SSH_AUTH_SOCK`) and Kerberos (`KRB5CCNAME`) credentials into the agent's session, so it can access private repos or internal services.
-4.  **Persistence**: All state is saved to `.orion/state.json`. You can attach to a running agent's session to debug:
-    ```bash
-    orion workflow enter [run-id] [step-id]
+Orion automatically injects your authentication context into the agent's environment so it can access private resources:
+
+*   **SSH**: `SSH_AUTH_SOCK` is forwarded (for cloning private Git repos).
+*   **Kerberos**: `KRB5CCNAME` is forwarded (for internal service authentication).
+*   **Custom Env**: You can define `env` in `agent.yaml`:
+    ```yaml
+    env:
+      - GOPROXY=https://goproxy.io
     ```

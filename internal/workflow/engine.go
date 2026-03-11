@@ -97,8 +97,9 @@ func (e *Engine) StartRun(workflowName, trigger, baseBranch, triggeredByNode str
 		return nil, err
 	}
 
-	// 5. Execute pipeline (Synchronous for now to ensure completion in CLI)
-	// In a real system, this might be handed off to a worker pool or daemon.
+	// 5. Execute pipeline (Synchronous)
+	// We run this synchronously to ensure the process stays alive while agents are running.
+	// Users can use 'nohup' or '&' to run in background if needed.
 	e.executePipeline(run, &wf)
 
 	return run, nil
@@ -147,7 +148,7 @@ func (e *Engine) executeStep(run *Run, step *StepStatus, stepDef *types.Pipeline
 	step.ShadowBranch = shadowBranch
 
 	// 3. Spawn Node (Worktree + Shadow Branch + Tmux)
-	node, err := e.spawnAgentNode(step.NodeName, shadowBranch, baseBranch, run.ID)
+	node, err := e.wm.CreateAgentNode(step.NodeName, shadowBranch, baseBranch, run.ID)
 	if err != nil {
 		return fmt.Errorf("failed to spawn node: %w", err)
 	}
@@ -212,10 +213,19 @@ Context:
 	}
 
 	// b. Load User Prompt (Agent specific)
+	var userPromptContent []byte
+	// Check if prompt is a file path relative to prompts directory
 	promptPath := filepath.Join(e.wm.RootPath, workspace.MetaDir, workspace.PromptsDir, agent.Prompt)
-	userPromptContent, err := os.ReadFile(promptPath)
-	if err != nil {
-		return fmt.Errorf("failed to load prompt %s: %w", agent.Prompt, err)
+	fileInfo, err := os.Stat(promptPath)
+	if err == nil && !fileInfo.IsDir() {
+		// It's a file, read it
+		userPromptContent, err = os.ReadFile(promptPath)
+		if err != nil {
+			return fmt.Errorf("failed to load prompt file %s: %w", agent.Prompt, err)
+		}
+	} else {
+		// It's not a file, treat agent.Prompt as the content directly
+		userPromptContent = []byte(agent.Prompt)
 	}
 
 	// c. Create Artifact Directory
@@ -321,13 +331,29 @@ Context:
 		// Replace {{.ArtifactDir}} just in case
 		cmdStr = strings.ReplaceAll(cmdStr, "{{.ArtifactDir}}", absArtifactDir)
 
+		// Prepare script content with auth context injection
+		// We capture current environment variables for SSH and Kerberos to ensure the agent
+		// has the same access rights as the user running Orion.
+		sshAuthSock := os.Getenv("SSH_AUTH_SOCK")
+		krb5ccName := os.Getenv("KRB5CCNAME")
+
+		authEnvInjection := ""
+		if sshAuthSock != "" {
+			authEnvInjection += fmt.Sprintf("export SSH_AUTH_SOCK=%q\n", sshAuthSock)
+		}
+		if krb5ccName != "" {
+			authEnvInjection += fmt.Sprintf("export KRB5CCNAME=%q\n", krb5ccName)
+		}
+
 		scriptContent := fmt.Sprintf(`#!/bin/sh
 set -x
+# Inject Authentication Context
+%s
 %s
 EXIT_CODE=$?
 echo $EXIT_CODE > .agent_exit_code
 exit $EXIT_CODE
-`, cmdStr)
+`, authEnvInjection, cmdStr)
 
 		scriptPath := filepath.Join(node.WorktreePath, "run_agent.sh")
 		if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
@@ -343,7 +369,7 @@ exit $EXIT_CODE
 		}
 
 		// Wait for completion
-		exitCode, err := e.waitForAgent(node.WorktreePath)
+		exitCode, err := e.waitForAgent(sessionName, node.WorktreePath)
 		if err != nil {
 			return fmt.Errorf("agent execution error: %w", err)
 		}
@@ -423,52 +449,6 @@ func (e *Engine) resolveBaseBranch(run *Run, stepDef *types.PipelineStep) (strin
 	return "", fmt.Errorf("dependency %s not found", depID)
 }
 
-func (e *Engine) spawnAgentNode(nodeName, shadowBranch, baseBranch, createdBy string) (*types.Node, error) {
-	// Agent nodes are stored in .orion/agent-nodes/ to keep them hidden from the main workspace list
-	agentNodesDir := filepath.Join(e.wm.RootPath, workspace.MetaDir, "agent-nodes")
-	if err := os.MkdirAll(agentNodesDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create agent nodes directory: %w", err)
-	}
-	worktreePath := filepath.Join(agentNodesDir, nodeName)
-
-	// 1. Create Shadow Branch & Worktree
-	// We use git.AddWorktree directly.
-	// If shadowBranch == baseBranch, we are just checking it out (not typical for agent, but possible).
-	// Typically shadowBranch is new, baseBranch is existing.
-	if err := git.AddWorktree(e.wm.State.RepoPath, worktreePath, shadowBranch, baseBranch); err != nil {
-		return nil, err
-	}
-
-	// 2. Create Tmux Session
-	sessionName := fmt.Sprintf("orion-%s", nodeName)
-	if err := tmux.NewSession(sessionName, worktreePath); err != nil {
-		return nil, fmt.Errorf("failed to create tmux session: %w", err)
-	}
-
-	// 3. Update State
-	node := types.Node{
-		Name:          nodeName,
-		LogicalBranch: baseBranch, // Logically related to base
-		ShadowBranch:  shadowBranch,
-		WorktreePath:  worktreePath,
-		Label:         "agent",
-		CreatedBy:     createdBy,
-		TmuxSession:   sessionName,
-		CreatedAt:     time.Now(),
-	}
-
-	if e.wm.State.Nodes == nil {
-		e.wm.State.Nodes = make(map[string]types.Node)
-	}
-	e.wm.State.Nodes[nodeName] = node
-	if err := e.wm.SaveState(); err != nil {
-		return nil, err
-	}
-	e.wm.SyncVSCodeWorkspace()
-
-	return &node, nil
-}
-
 func (e *Engine) getDiffContext(path, from, to string) (string, error) {
 	cmd := exec.Command("git", "diff", from, to)
 	cmd.Dir = path
@@ -491,10 +471,11 @@ func (e *Engine) renderPrompt(tmplContent string, data interface{}) (string, err
 	return buf.String(), nil
 }
 
-func (e *Engine) waitForAgent(worktreePath string) (int, error) {
+func (e *Engine) waitForAgent(sessionName, worktreePath string) (int, error) {
 	markerFile := filepath.Join(worktreePath, ".agent_exit_code")
-	timeout := time.After(5 * time.Minute) // 5 minute timeout for agent
-	ticker := time.NewTicker(1 * time.Second)
+	// TODO: Make timeout configurable or unlimited for long running agents
+	timeout := time.After(30 * time.Minute)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -502,6 +483,7 @@ func (e *Engine) waitForAgent(worktreePath string) (int, error) {
 		case <-timeout:
 			return -1, fmt.Errorf("timeout waiting for agent")
 		case <-ticker.C:
+			// 1. Check if exit code file exists (Success/Failure)
 			data, err := os.ReadFile(markerFile)
 			if err == nil {
 				// File exists, read exit code
@@ -509,6 +491,15 @@ func (e *Engine) waitForAgent(worktreePath string) (int, error) {
 				var code int
 				fmt.Sscanf(codeStr, "%d", &code)
 				return code, nil
+			}
+
+			// 2. Check if Tmux session is still alive (Process Status)
+			// If marker file is missing BUT session is gone, it means the process was killed/crashed
+			// without writing the exit code.
+			exists := tmux.SessionExists(sessionName)
+			if !exists {
+				// Session is gone, but no exit code? Must be killed.
+				return -1, fmt.Errorf("agent process (session %s) was killed or crashed", sessionName)
 			}
 		}
 	}

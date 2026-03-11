@@ -27,7 +27,6 @@ const (
 	AgentsDir    = "agents"
 	PromptsDir   = "prompts"
 	RunsDir      = "runs"
-	RuntimeDir   = "runtime"
 )
 
 // WorkspaceManager handles all high-level operations on the Orion workspace.
@@ -98,7 +97,6 @@ func Init(rootPath, repoURL string) (*WorkspaceManager, error) {
 		filepath.Join(rootPath, MetaDir, AgentsDir),
 		filepath.Join(rootPath, MetaDir, PromptsDir),
 		filepath.Join(rootPath, MetaDir, RunsDir),
-		filepath.Join(rootPath, MetaDir, RuntimeDir),
 	}
 
 	for _, d := range dirs {
@@ -154,7 +152,7 @@ agents:
     traecli:
       command: 'traecli "{{.Prompt}}" -py'
     qwen:
-      command: 'traecli "{{.Prompt}}" -y'
+      command: 'qwen "{{.Prompt}}" -y'
 `
 	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, ConfigFile), []byte(configContent), 0644); err != nil {
 		return err
@@ -361,6 +359,54 @@ func (wm *WorkspaceManager) SpawnNode(nodeName, logicalBranch, baseBranch, label
 	return nil
 }
 
+// CreateAgentNode creates a dedicated ephemeral node for an AI agent.
+// It sets up the shadow branch, worktree, and tmux session.
+func (wm *WorkspaceManager) CreateAgentNode(nodeName, shadowBranch, baseBranch, createdBy string) (*types.Node, error) {
+	// Agent nodes are stored in .orion/agent-nodes/ to keep them hidden from the main workspace list
+	agentNodesDir := filepath.Join(wm.RootPath, MetaDir, "agent-nodes")
+	if err := os.MkdirAll(agentNodesDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create agent nodes directory: %w", err)
+	}
+	worktreePath := filepath.Join(agentNodesDir, nodeName)
+
+	// 1. Create Shadow Branch & Worktree
+	if err := git.AddWorktree(wm.State.RepoPath, worktreePath, shadowBranch, baseBranch); err != nil {
+		return nil, err
+	}
+
+	// 2. Create Tmux Session
+	sessionName := fmt.Sprintf("orion-%s", nodeName)
+	if err := tmux.NewSession(sessionName, worktreePath); err != nil {
+		return nil, fmt.Errorf("failed to create tmux session: %w", err)
+	}
+
+	// 3. Update State
+	node := types.Node{
+		Name:          nodeName,
+		LogicalBranch: baseBranch, // Logically related to base
+		ShadowBranch:  shadowBranch,
+		WorktreePath:  worktreePath,
+		Label:         "agent",
+		CreatedBy:     createdBy,
+		TmuxSession:   sessionName,
+		CreatedAt:     time.Now(),
+	}
+
+	if wm.State.Nodes == nil {
+		wm.State.Nodes = make(map[string]types.Node)
+	}
+	wm.State.Nodes[nodeName] = node
+
+	// 4. Persist State
+	if err := wm.SaveState(); err != nil {
+		return nil, err
+	}
+	// We might not want to sync agent nodes to VSCode workspace to avoid clutter
+	// wm.SyncVSCodeWorkspace()
+
+	return &node, nil
+}
+
 // EnterNode launches or attaches to a tmux session for the given node.
 func (wm *WorkspaceManager) EnterNode(nodeName string) error {
 	node, exists := wm.State.Nodes[nodeName]
@@ -368,7 +414,11 @@ func (wm *WorkspaceManager) EnterNode(nodeName string) error {
 		return fmt.Errorf("node '%s' does not exist", nodeName)
 	}
 
-	sessionName := fmt.Sprintf("orion-%s", nodeName)
+	// Use node's configured session name if available, otherwise construct default
+	sessionName := node.TmuxSession
+	if sessionName == "" {
+		sessionName = fmt.Sprintf("orion-%s", nodeName)
+	}
 
 	// Check if we are already inside tmux
 	if tmux.IsInsideTmux() {

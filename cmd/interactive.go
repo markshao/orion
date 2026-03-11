@@ -80,6 +80,12 @@ func SelectWorkflowRun(wm *workspace.WorkspaceManager) (string, error) {
 		Label: "Select a workflow run to inspect",
 		Items: items,
 		Size:  10,
+		Templates: &promptui.SelectTemplates{
+			Label:    "{{ . }}?",
+			Active:   "👉 {{ . | cyan }}",
+			Inactive: "   {{ . }}",
+			Selected: "✔ Selected run: {{ . | green }}",
+		},
 	}
 
 	_, result, err := prompt.Run()
@@ -120,6 +126,12 @@ func SelectWorkflowStep(run *workflow.Run) (string, error) {
 		Label: "Select a step to enter",
 		Items: items,
 		Size:  10,
+		Templates: &promptui.SelectTemplates{
+			Label:    "{{ . }}?",
+			Active:   "👉 {{ . | cyan }}",
+			Inactive: "   {{ . }}",
+			Selected: "✔ Selected step: {{ . | green }}",
+		},
 	}
 
 	_, result, err := prompt.Run()

@@ -518,7 +518,8 @@ var lsArtifactsCmd = &cobra.Command{
 			fmt.Printf("\n📂 Step: %s (%s)\n", step.ID, step.Agent)
 			for _, entry := range entries {
 				if !entry.IsDir() {
-					fmt.Printf("  - %s\n", entry.Name())
+					fullPath := filepath.Join(artifactDir, entry.Name())
+					fmt.Printf("  - %s  %s\n", entry.Name(), color.HiBlackString("(%s)", fullPath))
 				}
 			}
 		}

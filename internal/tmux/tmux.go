@@ -10,8 +10,7 @@ import (
 
 // SessionExists checks if a tmux session exists.
 func SessionExists(sessionName string) bool {
-	cmd := exec.Command("tmux", "has-session", "-t", sessionName)
-	return cmd.Run() == nil
+	return exec.Command("tmux", "has-session", "-t", sessionName).Run() == nil
 }
 
 // NewSession creates a new detached tmux session.

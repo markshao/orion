@@ -134,8 +134,8 @@ func TestInitGeneratesV1Configs(t *testing.T) {
 		t.Fatalf("failed to read ut-agent.yaml: %v", err)
 	}
 	content := string(data)
-	if !strings.Contains(content, "code-agent: qwen") {
-		t.Errorf("ut-agent.yaml does not configure qwen runtime; content: %s", content)
+	if !strings.Contains(content, "provider: qwen") {
+		t.Errorf("ut-agent.yaml does not configure qwen provider; content: %s", content)
 	}
 
 	// 2. prompts/ut.md should contain the updated unit test generation instructions

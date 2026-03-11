@@ -188,9 +188,7 @@ runtime:
   provider: qwen
   model: qwen-max
 
-prompt: |
-  Review the code changes and write unit tests for the modified functions.
-  Ensure high coverage and edge case handling.
+prompt: ut.md
 `
 	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, AgentsDir, "ut-agent.yaml"), []byte(utAgentContent), 0644); err != nil {
 		return err
@@ -204,15 +202,46 @@ runtime:
   provider: qwen
   model: qwen-max
 
-prompt: |
-  Review the code changes and provide constructive feedback.
-  Focus on performance, security, and readability.
+prompt: cr.md
 `
 	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, AgentsDir, "cr-agent.yaml"), []byte(crAgentContent), 0644); err != nil {
 		return err
 	}
 
-	// 5. prompts/base.md
+	// 5. prompts/ut.md
+	utPromptContent := `# Unit Test Generation
+
+Your task is to analyze the code changes provided below and **immediately generate and write unit tests** for them.
+
+**DO NOT OUTPUT CODE BLOCKS IN THE CHAT.**
+Write the tests directly into the repository files.
+
+Requirements:
+- Create or update *_test.go files as needed.
+- Ensure tests compile and pass.
+- Cover edge cases and expected behavior.
+
+If you need to write any non-code outputs (reports, summaries), write them to:
+{{.ArtifactDir}}
+`
+	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, PromptsDir, "ut.md"), []byte(utPromptContent), 0644); err != nil {
+		return err
+	}
+
+	// 6. prompts/cr.md
+	crPromptContent := `# Code Review
+
+Review the code changes and provide constructive feedback.
+Focus on correctness, performance, security, and readability.
+
+Write the review report to:
+{{.ArtifactDir}}/review_report.md
+`
+	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, PromptsDir, "cr.md"), []byte(crPromptContent), 0644); err != nil {
+		return err
+	}
+
+	// 7. prompts/base.md
 	basePromptContent := `You are an intelligent agent working in the Orion environment.
 
 # Context

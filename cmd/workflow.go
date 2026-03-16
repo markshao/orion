@@ -435,13 +435,13 @@ var enterWorkflowCmd = &cobra.Command{
 }
 
 var rmWorkflowCmd = &cobra.Command{
-	Use:   "rm [run_id]",
-	Short: "Remove a workflow run",
-	Long: `Removes a workflow run and cleans up its resources.
-If the run has active agentic nodes, removal will be blocked unless --force is used.`,
+	Use:   "rm [workflow_name]",
+	Short: "Remove a workflow definition",
+	Long: `Removes a workflow definition file.
+If there are running workflow instances, removal will be blocked unless --force is used.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		runID := args[0]
+		wfName := args[0]
 
 		force, _ := cmd.Flags().GetBool("force")
 
@@ -463,50 +463,64 @@ If the run has active agentic nodes, removal will be blocked unless --force is u
 			os.Exit(1)
 		}
 
-		// Get the run
-		engine := workflow.NewEngine(wm)
-		run, err := engine.GetRun(runID)
-		if err != nil {
-			color.Red("Run '%s' not found.", runID)
+		// Check if workflow file exists
+		wfPath := filepath.Join(wm.RootPath, workspace.MetaDir, workspace.WorkflowsDir, wfName+".yaml")
+		if _, err := os.Stat(wfPath); os.IsNotExist(err) {
+			color.Red("Workflow '%s' not found.", wfName)
 			os.Exit(1)
 		}
 
-		// Check if run is still running
-		if run.Status == workflow.StatusRunning {
-			if !force {
-				color.Red("Cannot remove run '%s': it is still running.", runID)
-				fmt.Println("\nUse --force to remove the run and all its agentic nodes.")
-				os.Exit(1)
-			}
-			color.Yellow("Force mode enabled. Run '%s' is still running.", runID)
+		// Check for running instances of this workflow
+		engine := workflow.NewEngine(wm)
+		runs, err := engine.ListRuns()
+		if err != nil {
+			color.Red("Failed to list workflow runs: %v", err)
+			os.Exit(1)
 		}
 
-		// Find and remove all agentic nodes created by this run
-		var nodesRemoved int
-		for nodeName, node := range wm.State.Nodes {
-			if node.CreatedBy == runID {
-				color.Yellow("Removing agentic node: %s", nodeName)
-				if err := wm.RemoveNode(nodeName); err != nil {
-					color.Red("  Failed to remove node '%s': %v", nodeName, err)
-				} else {
-					color.Green("  Node '%s' removed.", nodeName)
-					nodesRemoved++
+		var runningRuns []*workflow.Run
+		for i := range runs {
+			if runs[i].Workflow == wfName && runs[i].Status == workflow.StatusRunning {
+				runningRuns = append(runningRuns, &runs[i])
+			}
+		}
+
+		if len(runningRuns) > 0 {
+			if !force {
+				color.Red("Cannot remove workflow '%s': %d running instance(s) found.", wfName, len(runningRuns))
+				fmt.Println("\nRunning instances:")
+				for _, run := range runningRuns {
+					fmt.Printf("  - %s (started: %s)\n", run.ID, run.StartTime.Format("2006-01-02 15:04:05"))
+				}
+				fmt.Println("\nUse --force to remove the workflow and all its running instances.")
+				os.Exit(1)
+			}
+
+			// Force mode: remove all agentic nodes created by running instances
+			color.Yellow("Force mode enabled. Removing %d running instance(s)...", len(runningRuns))
+
+			for _, run := range runningRuns {
+				// Find and remove all nodes created by this run
+				for nodeName, node := range wm.State.Nodes {
+					if node.CreatedBy == run.ID {
+						color.Yellow("  Removing agentic node: %s", nodeName)
+						if err := wm.RemoveNode(nodeName); err != nil {
+							color.Red("    Failed to remove node '%s': %v", nodeName, err)
+						} else {
+							color.Green("    Node '%s' removed.", nodeName)
+						}
+					}
 				}
 			}
 		}
 
-		if nodesRemoved > 0 {
-			fmt.Printf("\nRemoved %d agentic node(s).\n", nodesRemoved)
-		}
-
-		// Remove the run directory
-		runDir := filepath.Join(wm.RootPath, workspace.MetaDir, workspace.RunsDir, runID)
-		if err := os.RemoveAll(runDir); err != nil {
-			color.Red("Failed to remove run directory: %v", err)
+		// Remove the workflow file
+		if err := os.Remove(wfPath); err != nil {
+			color.Red("Failed to remove workflow file: %v", err)
 			os.Exit(1)
 		}
 
-		color.Green("✅ Run '%s' removed successfully.", runID)
+		color.Green("✅ Workflow '%s' removed successfully.", wfName)
 	},
 }
 

@@ -71,6 +71,7 @@ myapp_orion/
 | `orion ls`                    | 列出所有活跃 Node 及其状态             | ✅ 已实现 |
 | `orion rm <name>`             | 删除 Node (清理 Worktree 和 Session)   | ✅ 已实现 |
 | `orion merge`                 | 将 Node 代码合并回逻辑分支             | ✅ 已实现 |
+| `orion run <cmd> [args...]`   | 在 main_repo 或指定 worktree 执行命令  | ✅ 已实现 |
 
 ## 快速开始
 
@@ -100,9 +101,40 @@ orion enter auth-test-node
 # 5. 查看状态
 orion ls
 
-# 6. 清理
+# 6. 在主仓库执行 git 命令（类似 uv run）
+orion run git pull
+orion run git fetch origin
+
+# 7. 在指定 node 的 worktree 中执行命令
+orion run -w auth-test-node npm test
+
+# 8. 清理
 orion rm auth-test-node
 ```
+
+### 3. `orion run` - 在指定上下文中执行命令
+
+`orion run` 允许你在 `main_repo` 或指定 Node 的 worktree 中执行任意命令，类似于 `uv run` 或 `poetry run`。
+
+```bash
+# 在主仓库执行命令（默认行为）
+orion run git status
+orion run git pull
+orion run git log --oneline -5
+orion run make build
+
+# 在指定 node 的 worktree 中执行命令
+orion run -w my-node go test ./...
+orion run --worktree my-node npm run build
+
+# 执行带参数的命令
+orion run ls -la
+orion run echo "Hello from Orion"
+```
+
+**环境变量**：
+- `ORION_RUN=1`：标记命令在 orion run 上下文中执行
+- `ORION_WORKTREE=<node-name>`：当使用 `-w` 标志时设置
 
 ## 待办事项 (Roadmap)
 

@@ -55,12 +55,12 @@ func (e *Engine) StartRun(workflowName, trigger, baseBranch, triggeredByNode str
 		}
 	}
 
-	// Capture trigger data (e.g. commit hash) if triggered by commit
+	// Capture trigger data if triggered by push
 	triggerData := ""
-	if trigger == "commit" {
-		// Get latest commit hash from main repo
+	if trigger == "push" {
+		// Get current branch and latest commit info
 		hash, err := git.GetLatestCommitHash(e.wm.State.RepoPath)
-		if err == nil {
+		if err == nil && len(hash) >= 7 {
 			triggerData = hash[:7] // Short hash
 		}
 	}

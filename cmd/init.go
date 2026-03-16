@@ -102,10 +102,10 @@ Clones the repository into a 'repo' subdirectory and sets up configuration.`,
 
 		// 7. Install Git Hooks (V1 Feature)
 		fmt.Println("Installing Git hooks...")
-		if err := git.InstallPostCommitHook(wm.State.RepoPath); err != nil {
-			fmt.Printf("Warning: Failed to install post-commit hook: %v\n", err)
+		if err := git.InstallPrePushHook(wm.State.RepoPath); err != nil {
+			fmt.Printf("Warning: Failed to install pre-push hook: %v\n", err)
 		} else {
-			fmt.Println("✔ Git post-commit hook installed.")
+			fmt.Println("✔ Git pre-push hook installed.")
 		}
 
 		fmt.Println("Workspace initialized successfully!")

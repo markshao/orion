@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-// InstallPostCommitHook installs a git hook to trigger Orion workflow.
-func InstallPostCommitHook(repoPath string) error {
+// InstallPrePushHook installs a git hook to trigger Orion workflow on push.
+func InstallPrePushHook(repoPath string) error {
 	hookDir := filepath.Join(repoPath, ".git", "hooks")
 	if _, err := os.Stat(hookDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(hookDir, 0755); err != nil {
@@ -18,16 +18,16 @@ func InstallPostCommitHook(repoPath string) error {
 		}
 	}
 
-	hookPath := filepath.Join(hookDir, "post-commit")
+	hookPath := filepath.Join(hookDir, "pre-push")
 	content := `#!/bin/sh
-# Orion Hook: Trigger workflow on commit
+# Orion Hook: Trigger workflow on push
 
-echo "🐝 Orion: Commit detected."
-orion workflow run default --trigger commit &
+echo "🐝 Orion: Push detected, triggering workflow..."
+orion workflow run default --trigger push &
 `
 
 	if err := os.WriteFile(hookPath, []byte(content), 0755); err != nil {
-		return fmt.Errorf("failed to write post-commit hook: %w", err)
+		return fmt.Errorf("failed to write pre-push hook: %w", err)
 	}
 
 	return nil

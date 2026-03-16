@@ -151,12 +151,8 @@ var lsWorkflowCmd = &cobra.Command{
 }
 
 func getTriggerDisplay(run workflow.Run) string {
-	if run.Trigger == "commit" && run.TriggerData != "" {
-		hash := run.TriggerData
-		if len(hash) > 7 {
-			hash = hash[:7]
-		}
-		return fmt.Sprintf("commit(%s)", hash)
+	if run.Trigger == "push" && run.TriggerData != "" {
+		return fmt.Sprintf("push(%s)", run.TriggerData)
 	}
 	return run.Trigger
 }
@@ -439,7 +435,7 @@ var enterWorkflowCmd = &cobra.Command{
 }
 
 func init() {
-	runWorkflowCmd.Flags().StringP("trigger", "t", "manual", "Trigger type (e.g. manual, commit)")
+	runWorkflowCmd.Flags().StringP("trigger", "t", "manual", "Trigger type (e.g. manual, push)")
 
 	rootCmd.AddCommand(workflowCmd)
 	workflowCmd.AddCommand(runWorkflowCmd)

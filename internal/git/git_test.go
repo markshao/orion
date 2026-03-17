@@ -225,3 +225,92 @@ func TestGetCurrentBranch(t *testing.T) {
     }
 }
 
+func TestPushBranch(t *testing.T) {
+    // 创建 bare 仓库作为 remote
+    remoteDir, err := os.MkdirTemp("", "orion-remote-test")
+    if err != nil {
+        t.Fatalf("failed to create temp remote dir: %v", err)
+    }
+    defer os.RemoveAll(remoteDir)
+
+    // 初始化 bare 仓库
+    cmd := exec.Command("git", "init", "--bare", remoteDir)
+    if output, err := cmd.CombinedOutput(); err != nil {
+        t.Fatalf("failed to init bare repo: %v, output: %s", err, output)
+    }
+
+    // 创建本地仓库
+    localDir, err := os.MkdirTemp("", "orion-local-test")
+    if err != nil {
+        t.Fatalf("failed to create temp local dir: %v", err)
+    }
+    defer os.RemoveAll(localDir)
+
+    cmd = exec.Command("git", "init", localDir)
+    if output, err := cmd.CombinedOutput(); err != nil {
+        t.Fatalf("failed to init local repo: %v, output: %s", err, output)
+    }
+
+    // 配置用户
+    _ = exec.Command("git", "-C", localDir, "config", "user.email", "test@example.com").Run()
+    _ = exec.Command("git", "-C", localDir, "config", "user.name", "Test User").Run()
+
+    // 创建初始提交
+    readme := filepath.Join(localDir, "README.md")
+    _ = os.WriteFile(readme, []byte("# Test Repo"), 0644)
+    _ = exec.Command("git", "-C", localDir, "add", ".").Run()
+    _ = exec.Command("git", "-C", localDir, "commit", "-m", "Initial commit").Run()
+
+    // 添加 remote
+    cmd = exec.Command("git", "-C", localDir, "remote", "add", "origin", remoteDir)
+    if err := cmd.Run(); err != nil {
+        t.Fatalf("failed to add remote: %v", err)
+    }
+
+    // 测试 1: 推送新分支
+    t.Run("PushNewBranch", func(t *testing.T) {
+        branchName := "feature/test-push"
+        _ = exec.Command("git", "-C", localDir, "checkout", "-b", branchName).Run()
+
+        // 在分支上创建提交
+        featureFile := filepath.Join(localDir, "feature.txt")
+        _ = os.WriteFile(featureFile, []byte("feature content"), 0644)
+        _ = exec.Command("git", "-C", localDir, "add", ".").Run()
+        _ = exec.Command("git", "-C", localDir, "commit", "-m", "Add feature").Run()
+
+        // 切回 main 分支（避免推送时分支被检出）
+        _ = exec.Command("git", "-C", localDir, "checkout", "main").Run()
+
+        if err := PushBranch(localDir, branchName); err != nil {
+            t.Errorf("PushBranch failed: %v", err)
+        }
+
+        // 验证远程仓库有该分支
+        cmd = exec.Command("git", "--git-dir", remoteDir, "branch")
+        output, err := cmd.Output()
+        if err != nil {
+            t.Fatalf("failed to list remote branches: %v", err)
+        }
+        if !containsString(string(output), branchName) {
+            t.Errorf("branch %s not found in remote", branchName)
+        }
+    })
+
+    // 测试 2: 推送不存在的分支
+    t.Run("PushNonExistentBranch", func(t *testing.T) {
+        err := PushBranch(localDir, "non-existent-branch")
+        if err == nil {
+            t.Error("expected error when pushing non-existent branch")
+        }
+    })
+}
+
+func containsString(s, substr string) bool {
+    for i := 0; i <= len(s)-len(substr); i++ {
+        if s[i:i+len(substr)] == substr {
+            return true
+        }
+    }
+    return false
+}
+

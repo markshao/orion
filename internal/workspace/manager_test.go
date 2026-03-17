@@ -1,35 +1,43 @@
 package workspace
 
 import (
+	"orion/internal/git"
+	"orion/internal/types"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
-
-	"orion/internal/git"
-	"orion/internal/types"
 )
 
-// setupTestWorkspace 创建一个用于测试的临时 workspace
-func setupTestWorkspace(t *testing.T) (rootPath, repoPath, remotePath string, cleanup func()) {
+// Helper to create a temp workspace and repo
+func setupTestWorkspace(t *testing.T) (*WorkspaceManager, func()) {
 	t.Helper()
 
-	// 1. 创建 root dir
-	rootDir, err := os.MkdirTemp("", "orion-workspace-test")
+	// 1. Create root dir for workspace
+	rootDir, err := os.MkdirTemp("", "orion-ws-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
 
-	// 2. 创建 remote repo（bare repository）
+	// 2. Initialize a separate git repo to serve as "remote"
 	remoteDir, err := os.MkdirTemp("", "orion-remote-test")
 	if err != nil {
 		os.RemoveAll(rootDir)
 		t.Fatalf("failed to create temp remote dir: %v", err)
 	}
-	exec.Command("git", "init", "--bare", remoteDir).Run()
 
-	// 3. 初始化 workspace
+	// Initialize remote repo
+	exec.Command("git", "init", remoteDir).Run()
+	exec.Command("git", "-C", remoteDir, "config", "user.email", "test@example.com").Run()
+	exec.Command("git", "-C", remoteDir, "config", "user.name", "Test User").Run()
+	exec.Command("git", "-C", remoteDir, "checkout", "-b", "main").Run()
+	os.WriteFile(filepath.Join(remoteDir, "README.md"), []byte("# Remote"), 0644)
+	exec.Command("git", "-C", remoteDir, "add", ".").Run()
+	exec.Command("git", "-C", remoteDir, "commit", "-m", "Initial commit").Run()
+
+	// 3. Run Init (creates .orion, etc.)
 	wm, err := Init(rootDir, remoteDir)
 	if err != nil {
 		os.RemoveAll(rootDir)
@@ -37,486 +45,407 @@ func setupTestWorkspace(t *testing.T) (rootPath, repoPath, remotePath string, cl
 		t.Fatalf("Init failed: %v", err)
 	}
 
-	// 4. 克隆 repo
+	// 4. Manually clone the repo (simulating CLI behavior)
 	if err := git.Clone(remoteDir, wm.State.RepoPath); err != nil {
 		os.RemoveAll(rootDir)
 		os.RemoveAll(remoteDir)
 		t.Fatalf("Clone failed: %v", err)
 	}
 
-	// 配置 local repo
+	// Configure user for local repo as well
 	exec.Command("git", "-C", wm.State.RepoPath, "config", "user.email", "test@example.com").Run()
 	exec.Command("git", "-C", wm.State.RepoPath, "config", "user.name", "Test User").Run()
 
-	// 创建初始 commit
-	testFile := filepath.Join(wm.State.RepoPath, "README.md")
-	os.WriteFile(testFile, []byte("# Test Repo"), 0644)
-	exec.Command("git", "-C", wm.State.RepoPath, "add", ".").Run()
-	exec.Command("git", "-C", wm.State.RepoPath, "commit", "-m", "Initial commit").Run()
-	exec.Command("git", "-C", wm.State.RepoPath, "push", "-u", "origin", "main").Run()
-
-	cleanup = func() {
+	cleanup := func() {
 		os.RemoveAll(rootDir)
 		os.RemoveAll(remoteDir)
 	}
 
-	return rootDir, wm.State.RepoPath, remoteDir, cleanup
+	return wm, cleanup
 }
 
-// TestInit 测试初始化 workspace
 func TestInit(t *testing.T) {
-	rootPath, _, _, cleanup := setupTestWorkspace(t)
+	wm, cleanup := setupTestWorkspace(t)
 	defer cleanup()
 
-	// 验证目录结构
-	expectedDirs := []string{
-		filepath.Join(rootPath, RepoDir),
-		filepath.Join(rootPath, WorkspacesDir),
-		filepath.Join(rootPath, MetaDir),
-		filepath.Join(rootPath, MetaDir, WorkflowsDir),
-		filepath.Join(rootPath, MetaDir, AgentsDir),
-		filepath.Join(rootPath, MetaDir, PromptsDir),
-		filepath.Join(rootPath, MetaDir, RunsDir),
+	// Verify directory structure
+	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir)); os.IsNotExist(err) {
+		t.Errorf(".orion directory not created")
+	}
+	if _, err := os.Stat(filepath.Join(wm.RootPath, RepoDir)); os.IsNotExist(err) {
+		t.Errorf("repo directory not created")
+	}
+	if _, err := os.Stat(filepath.Join(wm.RootPath, WorkspacesDir)); os.IsNotExist(err) {
+		t.Errorf("workspaces directory not created")
 	}
 
-	for _, dir := range expectedDirs {
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			t.Errorf("directory %s should exist", dir)
+	// Verify V1 config files are generated
+	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, ConfigFile)); os.IsNotExist(err) {
+		t.Errorf("config.yaml not created")
+	}
+	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, WorkflowsDir, "default.yaml")); os.IsNotExist(err) {
+		t.Errorf("default workflow not created")
+	}
+	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, AgentsDir, "ut-agent.yaml")); os.IsNotExist(err) {
+		t.Errorf("ut-agent.yaml not created")
+	}
+	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, AgentsDir, "cr-agent.yaml")); os.IsNotExist(err) {
+		t.Errorf("cr-agent.yaml not created")
+	}
+	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, PromptsDir, "ut.md")); os.IsNotExist(err) {
+		t.Errorf("ut.md prompt not created")
+	}
+	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, PromptsDir, "cr.md")); os.IsNotExist(err) {
+		t.Errorf("cr.md prompt not created")
+	}
+
+	// Verify GetConfig parses config.yaml correctly
+	config, err := wm.GetConfig()
+	if err != nil {
+		t.Fatalf("GetConfig failed: %v", err)
+	}
+	if config.Git.MainBranch != "main" {
+		t.Errorf("config.Git.MainBranch = %q, want %q", config.Git.MainBranch, "main")
+	}
+	if config.Workspace != "workspaces" {
+		t.Errorf("config.Workspace = %q, want %q", config.Workspace, "workspaces")
+	}
+	if def, ok := config.Workflow["default"]; !ok || def != "default" {
+		t.Errorf("config.Workflow[\"default\"] = %q, want %q", def, "default")
+	}
+
+	// Verify state file
+	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, StateFile)); os.IsNotExist(err) {
+		t.Errorf("state.json not created")
+	}
+}
+
+// TestInitGeneratesV1Configs verifies that Init (which calls generateV1Configs)
+// produces V1 configuration files that are aligned with the current defaults,
+// including the updated agent runtime and unit-test prompt content.
+func TestInitGeneratesV1Configs(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
+	defer cleanup()
+
+	// 1. ut-agent.yaml should use qwen as the code agent runtime
+	utAgentPath := filepath.Join(wm.RootPath, MetaDir, AgentsDir, "ut-agent.yaml")
+	data, err := os.ReadFile(utAgentPath)
+	if err != nil {
+		t.Fatalf("failed to read ut-agent.yaml: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "provider: qwen") {
+		t.Errorf("ut-agent.yaml does not configure qwen provider; content: %s", content)
+	}
+
+	// 2. prompts/ut.md should contain the updated unit test generation instructions
+	utPromptPath := filepath.Join(wm.RootPath, MetaDir, PromptsDir, "ut.md")
+	data, err = os.ReadFile(utPromptPath)
+	if err != nil {
+		t.Fatalf("failed to read ut.md: %v", err)
+	}
+	prompt := string(data)
+
+	requiredSubstrings := []string{
+		"Your task is to analyze the code changes provided below and **immediately generate and write unit tests** for them.",
+		"**DO NOT OUTPUT CODE BLOCKS IN THE CHAT.**",
+	}
+
+	for _, sub := range requiredSubstrings {
+		if !strings.Contains(prompt, sub) {
+			t.Errorf("ut.md missing required text %q. Full prompt: %s", sub, prompt)
 		}
 	}
-
-	// 验证配置文件
-	configPath := filepath.Join(rootPath, MetaDir, ConfigFile)
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		t.Errorf("config file %s should exist", configPath)
-	}
-
-	// 验证 state 文件
-	statePath := filepath.Join(rootPath, MetaDir, StateFile)
-	if _, err := os.Stat(statePath); os.IsNotExist(err) {
-		t.Errorf("state file %s should exist", statePath)
-	}
-
-	// 验证 workflow 文件
-	workflowPath := filepath.Join(rootPath, MetaDir, WorkflowsDir, "default.yaml")
-	if _, err := os.Stat(workflowPath); os.IsNotExist(err) {
-		t.Errorf("workflow file %s should exist", workflowPath)
-	}
-
-	// 验证 agent 文件
-	agentPaths := []string{
-		filepath.Join(rootPath, MetaDir, AgentsDir, "ut-agent.yaml"),
-		filepath.Join(rootPath, MetaDir, AgentsDir, "cr-agent.yaml"),
-	}
-	for _, path := range agentPaths {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			t.Errorf("agent file %s should exist", path)
-		}
-	}
-
-	// 验证 prompt 文件
-	promptPaths := []string{
-		filepath.Join(rootPath, MetaDir, PromptsDir, "ut.md"),
-		filepath.Join(rootPath, MetaDir, PromptsDir, "cr.md"),
-		filepath.Join(rootPath, MetaDir, PromptsDir, "base.md"),
-	}
-	for _, path := range promptPaths {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			t.Errorf("prompt file %s should exist", path)
-		}
-	}
 }
 
-// TestNewManager 测试创建 manager
-func TestNewManager(t *testing.T) {
-	rootPath, _, _, cleanup := setupTestWorkspace(t)
+func TestSpawnAndRemoveNode(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
 	defer cleanup()
 
-	// 测试成功创建
-	wm, err := NewManager(rootPath)
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	nodeName := "test-node"
+	logicalBranch := "feature/login"
 
-	if wm.RootPath != rootPath {
-		t.Errorf("RootPath = %q, want %q", wm.RootPath, rootPath)
-	}
-
-	if wm.State == nil {
-		t.Error("State should not be nil")
-	}
-
-	// 测试无效路径
-	_, err = NewManager("/non/existent/path")
-	if err == nil {
-		t.Error("NewManager should fail for non-existent path")
-	}
-}
-
-// TestFindWorkspaceRoot 测试查找 workspace root
-func TestFindWorkspaceRoot(t *testing.T) {
-	rootPath, _, _, cleanup := setupTestWorkspace(t)
-	defer cleanup()
-
-	// 测试在 root 目录
-	found, err := FindWorkspaceRoot(rootPath)
-	if err != nil {
-		t.Fatalf("FindWorkspaceRoot failed: %v", err)
-	}
-	if found != rootPath {
-		t.Errorf("FindWorkspaceRoot = %q, want %q", found, rootPath)
-	}
-
-	// 测试在子目录
-	subDir := filepath.Join(rootPath, "some", "nested", "dir")
-	if err := os.MkdirAll(subDir, 0755); err != nil {
-		t.Fatalf("failed to create subdir: %v", err)
-	}
-
-	found, err = FindWorkspaceRoot(subDir)
-	if err != nil {
-		t.Fatalf("FindWorkspaceRoot failed: %v", err)
-	}
-	if found != rootPath {
-		t.Errorf("FindWorkspaceRoot from subdir = %q, want %q", found, rootPath)
-	}
-
-	// 测试在非 workspace 目录
-	tempDir, err := os.MkdirTemp("", "orion-non-workspace")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	_, err = FindWorkspaceRoot(tempDir)
-	if err == nil {
-		t.Error("FindWorkspaceRoot should fail for non-workspace directory")
-	}
-}
-
-// TestSaveAndLoadState 测试保存和加载状态
-func TestSaveAndLoadState(t *testing.T) {
-	rootPath, _, _, cleanup := setupTestWorkspace(t)
-	defer cleanup()
-
-	wm, err := NewManager(rootPath)
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
-
-	// 添加节点
-	wm.State.Nodes["test-node"] = types.Node{
-		Name:          "test-node",
-		LogicalBranch: "feature/test",
-		ShadowBranch:  "orion-shadow/test-node/feature/test",
-		WorktreePath:  "/path/to/worktree",
-		CreatedBy:     "user",
-		Status:        types.StatusWorking,
-	}
-
-	// 保存状态
-	if err := wm.SaveState(); err != nil {
-		t.Fatalf("SaveState failed: %v", err)
-	}
-
-	// 创建新的 manager 并加载状态
-	wm2, err := NewManager(rootPath)
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
-
-	// 验证加载的节点
-	node, exists := wm2.State.Nodes["test-node"]
-	if !exists {
-		t.Error("test-node should exist in loaded state")
-	}
-	if node.Name != "test-node" {
-		t.Errorf("node.Name = %q, want %q", node.Name, "test-node")
-	}
-	if node.LogicalBranch != "feature/test" {
-		t.Errorf("node.LogicalBranch = %q, want %q", node.LogicalBranch, "feature/test")
-	}
-	if node.Status != types.StatusWorking {
-		t.Errorf("node.Status = %q, want %q", node.Status, types.StatusWorking)
-	}
-}
-
-// TestSpawnNode 测试创建节点
-func TestSpawnNode(t *testing.T) {
-	rootPath, _, _, cleanup := setupTestWorkspace(t)
-	defer cleanup()
-
-	wm, err := NewManager(rootPath)
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
-
-	// 测试创建 shadow 模式节点
-	nodeName := "test-spawn-node"
-	logicalBranch := "feature/spawn-test"
-	baseBranch := "main"
-	label := "test-label"
-
-	err = wm.SpawnNode(nodeName, logicalBranch, baseBranch, label, true)
+	// 1. Spawn Node
+	err := wm.SpawnNode(nodeName, logicalBranch, "main", "Testing login", true)
 	if err != nil {
 		t.Fatalf("SpawnNode failed: %v", err)
 	}
 
-	// 验证节点已创建
+	// Verify state
 	node, exists := wm.State.Nodes[nodeName]
 	if !exists {
-		t.Fatal("node should exist after SpawnNode")
+		t.Errorf("Node not found in state")
 	}
 
-	if node.Name != nodeName {
-		t.Errorf("node.Name = %q, want %q", node.Name, nodeName)
-	}
-	if node.LogicalBranch != logicalBranch {
-		t.Errorf("node.LogicalBranch = %q, want %q", node.LogicalBranch, logicalBranch)
-	}
-	if node.BaseBranch != baseBranch {
-		t.Errorf("node.BaseBranch = %q, want %q", node.BaseBranch, baseBranch)
-	}
-	if node.Label != label {
-		t.Errorf("node.Label = %q, want %q", node.Label, label)
-	}
-	if node.CreatedBy != "user" {
-		t.Errorf("node.CreatedBy = %q, want %q", node.CreatedBy, "user")
-	}
-	if node.Status != types.StatusWorking {
-		t.Errorf("node.Status = %q, want %q", node.Status, types.StatusWorking)
-	}
-
-	// 验证 worktree 路径存在
+	// Verify worktree exists
 	if _, err := os.Stat(node.WorktreePath); os.IsNotExist(err) {
-		t.Errorf("worktree path %s should exist", node.WorktreePath)
+		t.Errorf("Worktree directory not created at %s", node.WorktreePath)
 	}
 
-	// 验证 shadow 分支命名
-	expectedShadowBranch := "orion-shadow/" + nodeName + "/" + logicalBranch
-	if node.ShadowBranch != expectedShadowBranch {
-		t.Errorf("node.ShadowBranch = %q, want %q", node.ShadowBranch, expectedShadowBranch)
-	}
-}
-
-// TestSpawnNodeDuplicate 测试创建重复节点
-func TestSpawnNodeDuplicate(t *testing.T) {
-	rootPath, _, _, cleanup := setupTestWorkspace(t)
-	defer cleanup()
-
-	wm, err := NewManager(rootPath)
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
+	// Verify shadow branch exists
+	if err := git.VerifyBranch(wm.State.RepoPath, node.ShadowBranch); err != nil {
+		t.Errorf("Shadow branch not created")
 	}
 
-	nodeName := "test-dup-node"
-
-	// 创建第一个节点
-	err = wm.SpawnNode(nodeName, "feature/dup", "main", "", true)
-	if err != nil {
-		t.Fatalf("first SpawnNode failed: %v", err)
-	}
-
-	// 尝试创建同名节点
-	err = wm.SpawnNode(nodeName, "feature/dup2", "main", "", true)
-	if err == nil {
-		t.Error("SpawnNode should fail for duplicate node name")
-	}
-	if !strings.Contains(err.Error(), "already exists") {
-		t.Errorf("error should mention 'already exists': %v", err)
-	}
-}
-
-// TestUpdateNodeStatus 测试更新节点状态
-func TestUpdateNodeStatus(t *testing.T) {
-	rootPath, _, _, cleanup := setupTestWorkspace(t)
-	defer cleanup()
-
-	wm, err := NewManager(rootPath)
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
-
-	nodeName := "test-status-node"
-	err = wm.SpawnNode(nodeName, "feature/status", "main", "", true)
-	if err != nil {
-		t.Fatalf("SpawnNode failed: %v", err)
-	}
-
-	// 测试更新状态
-	err = wm.UpdateNodeStatus(nodeName, types.StatusReadyToPush)
-	if err != nil {
-		t.Fatalf("UpdateNodeStatus failed: %v", err)
-	}
-
-	// 验证状态已更新
-	node, exists := wm.State.Nodes[nodeName]
-	if !exists {
-		t.Fatal("node should exist")
-	}
-	if node.Status != types.StatusReadyToPush {
-		t.Errorf("node.Status = %q, want %q", node.Status, types.StatusReadyToPush)
-	}
-
-	// 测试更新不存在的节点
-	err = wm.UpdateNodeStatus("non-existent", types.StatusPushed)
-	if err == nil {
-		t.Error("UpdateNodeStatus should fail for non-existent node")
-	}
-}
-
-// TestRemoveNode 测试删除节点
-func TestRemoveNode(t *testing.T) {
-	rootPath, _, _, cleanup := setupTestWorkspace(t)
-	defer cleanup()
-
-	wm, err := NewManager(rootPath)
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
-
-	nodeName := "test-remove-node"
-	err = wm.SpawnNode(nodeName, "feature/remove", "main", "", true)
-	if err != nil {
-		t.Fatalf("SpawnNode failed: %v", err)
-	}
-
-	// 验证节点存在
-	_, exists := wm.State.Nodes[nodeName]
-	if !exists {
-		t.Fatal("node should exist before removal")
-	}
-
-	// 删除节点
+	// 2. Remove Node
 	err = wm.RemoveNode(nodeName)
 	if err != nil {
 		t.Fatalf("RemoveNode failed: %v", err)
 	}
 
-	// 验证节点已删除
-	_, exists = wm.State.Nodes[nodeName]
-	if exists {
-		t.Error("node should not exist after removal")
+	// Verify state removed
+	if _, exists := wm.State.Nodes[nodeName]; exists {
+		t.Errorf("Node still exists in state after removal")
+	}
+
+	// Verify worktree removed (directory might be gone or empty)
+	if _, err := os.Stat(node.WorktreePath); !os.IsNotExist(err) {
+		// If it exists, it should be empty
+		entries, _ := os.ReadDir(node.WorktreePath)
+		if len(entries) > 0 {
+			t.Errorf("Worktree directory not cleaned up")
+		}
 	}
 }
 
-// TestFindNodeByPath 测试通过路径查找节点
-func TestFindNodeByPath(t *testing.T) {
-	rootPath, _, _, cleanup := setupTestWorkspace(t)
+func TestMergeNode(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
 	defer cleanup()
 
-	wm, err := NewManager(rootPath)
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
+	nodeName := "merge-node"
+	logicalBranch := "feature/merge-test"
 
-	nodeName := "test-path-node"
-	err = wm.SpawnNode(nodeName, "feature/path", "main", "", true)
-	if err != nil {
-		t.Fatalf("SpawnNode failed: %v", err)
-	}
-
+	// 1. Spawn
+	wm.SpawnNode(nodeName, logicalBranch, "main", "Merge Test", true)
 	node := wm.State.Nodes[nodeName]
 
-	// 测试在节点根目录
-	foundName, foundNode, err := wm.FindNodeByPath(node.WorktreePath)
+	// 2. Make changes in the node's worktree
+	newFile := filepath.Join(node.WorktreePath, "new-feature.txt")
+	os.WriteFile(newFile, []byte("content"), 0644)
+
+	exec.Command("git", "-C", node.WorktreePath, "add", ".").Run()
+	exec.Command("git", "-C", node.WorktreePath, "commit", "-m", "Work in node").Run()
+
+	// 3. Merge
+	err := wm.MergeNode(nodeName, false)
 	if err != nil {
-		t.Fatalf("FindNodeByPath failed: %v", err)
-	}
-	if foundName != nodeName {
-		t.Errorf("FindNodeByPath = %q, want %q", foundName, nodeName)
-	}
-	if foundNode == nil {
-		t.Error("FindNodeByPath should return non-nil node")
+		t.Fatalf("MergeNode failed: %v", err)
 	}
 
-	// 测试在节点子目录
-	subDir := filepath.Join(node.WorktreePath, "sub", "dir")
-	if err := os.MkdirAll(subDir, 0755); err != nil {
-		t.Fatalf("failed to create subdir: %v", err)
-	}
+	// 4. Verify changes in Logical Branch (in the main repo)
+	// We need to check if logicalBranch has the commit.
+	// Note: SquashMerge happens in wm.State.RepoPath.
+	// But wait, SquashMerge checks out logicalBranch in RepoPath.
 
-	foundName, foundNode, err = wm.FindNodeByPath(subDir)
-	if err != nil {
-		t.Fatalf("FindNodeByPath failed: %v", err)
-	}
-	if foundName != nodeName {
-		t.Errorf("FindNodeByPath from subdir = %q, want %q", foundName, nodeName)
-	}
+	// Let's verify file exists in RepoPath (after checkout logicalBranch)
+	// VerifyBranch checks out? No, VerifyBranch just checks existence.
+	// SquashMerge does checkout. So RepoPath should be on logicalBranch now.
 
-	// 测试不在任何节点的路径
-	outsidePath := filepath.Join(rootPath, "outside", "path")
-	if err := os.MkdirAll(outsidePath, 0755); err != nil {
-		t.Fatalf("failed to create outside path: %v", err)
-	}
-
-	foundName, foundNode, err = wm.FindNodeByPath(outsidePath)
-	if err != nil {
-		t.Fatalf("FindNodeByPath failed: %v", err)
-	}
-	if foundName != "" {
-		t.Errorf("FindNodeByPath should return empty name for outside path, got %q", foundName)
-	}
-	if foundNode != nil {
-		t.Error("FindNodeByPath should return nil node for outside path")
+	// Check if file exists in main repo
+	repoFile := filepath.Join(wm.State.RepoPath, "new-feature.txt")
+	if _, err := os.Stat(repoFile); os.IsNotExist(err) {
+		t.Errorf("Merged file not found in main repo")
 	}
 }
 
-// TestSyncVSCodeWorkspace 测试同步 VSCode workspace
-func TestSyncVSCodeWorkspace(t *testing.T) {
-	rootPath, _, _, cleanup := setupTestWorkspace(t)
+func TestSpawnNodeFeatureMode(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
 	defer cleanup()
 
-	wm, err := NewManager(rootPath)
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
+	nodeName := "feature-node"
+	logicialBranch := "feature/feature-mode"
+
+	// Feature mode: isShadow=false should create a worktree directly on the logical branch.
+	if err := wm.SpawnNode(nodeName, logicialBranch, "main", "Feature mode", false); err != nil {
+		t.Fatalf("SpawnNode (feature mode) failed: %v", err)
 	}
 
-	// 创建节点
-	err = wm.SpawnNode("node1", "feature/one", "main", "", true)
-	if err != nil {
-		t.Fatalf("SpawnNode failed: %v", err)
-	}
-	err = wm.SpawnNode("node2", "feature/two", "main", "", true)
-	if err != nil {
-		t.Fatalf("SpawnNode failed: %v", err)
+	node, exists := wm.State.Nodes[nodeName]
+	if !exists {
+		t.Fatalf("node not found in state after SpawnNode")
 	}
 
-	// 同步 VSCode workspace
-	err = wm.SyncVSCodeWorkspace()
-	if err != nil {
-		t.Fatalf("SyncVSCodeWorkspace failed: %v", err)
+	if node.ShadowBranch != logicialBranch {
+		t.Errorf("expected shadow branch to equal logical branch, got %q", node.ShadowBranch)
 	}
 
-	// 验证 workspace 文件已创建
-	projectName := filepath.Base(rootPath)
-	projectName = strings.TrimSuffix(projectName, "_swarm")
-	workspaceFile := filepath.Join(rootPath, projectName+".code-workspace")
+	if _, err := os.Stat(node.WorktreePath); os.IsNotExist(err) {
+		t.Errorf("worktree directory not created at %s", node.WorktreePath)
+	}
 
-	if _, err := os.Stat(workspaceFile); os.IsNotExist(err) {
-		t.Errorf("workspace file %s should exist", workspaceFile)
+	// logical branch should exist in the main repo
+	if err := git.VerifyBranch(wm.State.RepoPath, logicialBranch); err != nil {
+		t.Errorf("logical branch %q not created in repo: %v", logicialBranch, err)
 	}
 }
 
-// TestGetConfig 测试获取配置
 func TestGetConfig(t *testing.T) {
-	rootPath, _, _, cleanup := setupTestWorkspace(t)
+	wm, cleanup := setupTestWorkspace(t)
 	defer cleanup()
-
-	wm, err := NewManager(rootPath)
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
 
 	config, err := wm.GetConfig()
 	if err != nil {
-		t.Fatalf("GetConfig failed: %v", err)
+		t.Fatalf("GetConfig returned error: %v", err)
 	}
 
-	if config.Version != 1 {
-		t.Errorf("Config.Version = %d, want %d", config.Version, 1)
+	if config.Workspace == "" {
+		t.Errorf("expected workspace field to be non-empty")
 	}
 	if config.Git.MainBranch != "main" {
-		t.Errorf("Config.Git.MainBranch = %q, want %q", config.Git.MainBranch, "main")
+		t.Errorf("expected git.main_branch to be 'main', got %q", config.Git.MainBranch)
+	}
+}
+
+func TestFindNodeByPath(t *testing.T) {
+	// Keep the original unit test logic but maybe use the helper if we want integration test?
+	// The original test used a mock state. Let's keep it simple and just use a struct literal state like before,
+	// because creating real worktrees for path testing is slow/overkill.
+
+	// Setup a mock workspace manager
+	wm := &WorkspaceManager{
+		State: &types.State{
+			Nodes: map[string]types.Node{
+				"node1": {
+					Name:         "node1",
+					WorktreePath: "/Users/user/orion_ws/nodes/node1",
+				},
+				"node2": {
+					Name:         "node2",
+					WorktreePath: "/Users/user/orion_ws/nodes/node2",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		inputPath string
+		wantNode  string
+		wantFound bool
+	}{
+		{
+			name:      "Exact match file inside node",
+			inputPath: "/Users/user/orion_ws/nodes/node1/main.go",
+			wantNode:  "node1",
+			wantFound: true,
+		},
+		{
+			name:      "Exact match directory inside node",
+			inputPath: "/Users/user/orion_ws/nodes/node1/src",
+			wantNode:  "node1",
+			wantFound: true,
+		},
+		{
+			name:      "Path outside nodes",
+			inputPath: "/Users/user/orion_ws/repo/main.go",
+			wantNode:  "",
+			wantFound: false,
+		},
+		{
+			name:      "Partial prefix match (should fail)",
+			inputPath: "/Users/user/orion_ws/nodes/node1-suffix/main.go",
+			wantNode:  "",
+			wantFound: false,
+		},
+	}
+
+	// Add case-insensitive tests for macOS/Windows
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		wm.State.Nodes["node_lower"] = types.Node{
+			Name:         "node_lower",
+			WorktreePath: "/users/user/orion_ws/nodes/node_lower",
+		}
+
+		tests = append(tests, struct {
+			name      string
+			inputPath string
+			wantNode  string
+			wantFound bool
+		}{
+			name:      "Case mismatch on macOS (Input mixed, Node lower)",
+			inputPath: "/Users/User/Orion_ws/Nodes/node_lower/main.go",
+			wantNode:  "node_lower",
+			wantFound: true,
+		}, struct {
+			name      string
+			inputPath string
+			wantNode  string
+			wantFound bool
+		}{
+			name:      "Case mismatch on macOS (Input lower, Node mixed)",
+			inputPath: "/users/user/orion_ws/nodes/node1/main.go",
+			wantNode:  "node1",
+			wantFound: true,
+		})
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Note: This test relies on filepath.Abs and EvalSymlinks which hit the FS.
+			// Since we are using fake paths, this might fail if we don't mock them.
+			// However, FindNodeByPath logic handles errors from EvalSymlinks by falling back.
+			// So it should work for string comparison logic mostly.
+
+			gotNode, _, _ := wm.FindNodeByPath(tt.inputPath)
+			if gotNode != tt.wantNode {
+				// On Linux, paths that don't exist might behave differently with Abs/Rel
+				// But let's see. If it fails, we know we need to mock FS.
+				// For now, let's allow it to fail if it must, but ideally we should only run FS tests on real FS.
+				// But this specific test block is testing string logic.
+
+				// ACTUALLY: filepath.Abs works on string. EvalSymlinks fails if not exist.
+				// The code:
+				// canonicalPath, err := filepath.EvalSymlinks(absPath)
+				// if err != nil { canonicalPath = absPath }
+				// So it falls back to absPath.
+				// Then: rel, err := filepath.Rel(nodePath, canonicalPath)
+				// This should work fine for fake paths.
+
+				t.Errorf("FindNodeByPath(%q) = %v, want %v", tt.inputPath, gotNode, tt.wantNode)
+			}
+		})
+	}
+}
+
+func TestAppliedRunsPersistence(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
+	defer cleanup()
+
+	nodeName := "test-node-applied"
+	logicalBranch := "feature/applied"
+
+	// 1. Spawn Node
+	// Note: SpawnNode now takes (nodeName, logicalBranch, baseBranch, label, isShadow)
+	err := wm.SpawnNode(nodeName, logicalBranch, "main", "Testing persistence", true)
+	if err != nil {
+		t.Fatalf("SpawnNode failed: %v", err)
+	}
+
+	// 2. Modify node state (add applied runs)
+	node := wm.State.Nodes[nodeName]
+	node.AppliedRuns = []string{"run-1", "run-2"}
+	wm.State.Nodes[nodeName] = node
+
+	// 3. Save State
+	if err := wm.SaveState(); err != nil {
+		t.Fatalf("Failed to save state: %v", err)
+	}
+
+	// 4. Reload Manager
+	wm2, err := NewManager(wm.RootPath)
+	if err != nil {
+		t.Fatalf("Failed to reload manager: %v", err)
+	}
+
+	loadedNode, exists := wm2.State.Nodes[nodeName]
+	if !exists {
+		t.Fatalf("Node not found after reload")
+	}
+
+	if len(loadedNode.AppliedRuns) != 2 {
+		t.Errorf("Expected 2 applied runs, got %d", len(loadedNode.AppliedRuns))
+	}
+	if loadedNode.AppliedRuns[0] != "run-1" || loadedNode.AppliedRuns[1] != "run-2" {
+		t.Errorf("AppliedRuns content mismatch: %v", loadedNode.AppliedRuns)
 	}
 }

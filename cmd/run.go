@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	// runWorktree 指定要在哪个 worktree 中执行命令（可选）
+	// runWorktree specifies which worktree to execute the command in (optional)
 	runWorktree string
 )
 
@@ -67,30 +67,30 @@ func determineExecDir(wm *workspace.WorkspaceManager, cwd string, targetWorktree
 // runCmd represents the run command
 var runCmd = &cobra.Command{
 	Use:   "run <command> [args...]",
-	Short: "在 main_repo 或指定 worktree 上下文中执行命令",
-	Long: `在 main_repo 或指定 worktree 上下文中执行任意命令。
+	Short: "Execute commands in the main_repo or specified worktree context",
+	Long: `Execute arbitrary commands in the main_repo or specified worktree context.
 
-默认情况下，命令会在 main_repo 目录下执行。
-使用 --worktree (-w) 标志可以指定在某个 node 的 worktree 中执行。
+By default, commands are executed in the main_repo directory.
+Use the --worktree (-w) flag to specify a node's worktree for execution.
 
-示例:
-  # 在主仓库执行 git pull
+Examples:
+  # Execute git pull in the main repository
   orion run git pull
 
-  # 在主仓库执行 git fetch origin
+  # Execute git fetch origin in the main repository
   orion run git fetch origin
 
-  # 在主仓库执行 make build
+  # Execute make build in the main repository
   orion run make build
 
-  # 在指定 node 的 worktree 中执行命令
+  # Execute commands in a specific node's worktree
   orion run -w my-node npm test
   orion run --worktree my-node go test ./...`,
 	DisableFlagParsing: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
-			fmt.Println("Error: 需要指定要执行的命令")
-			fmt.Println("用法: orion run <command> [args...]")
+			fmt.Println("Error: A command must be specified")
+			fmt.Println("Usage: orion run <command> [args...]")
 			os.Exit(1)
 		}
 
@@ -103,7 +103,7 @@ var runCmd = &cobra.Command{
 			arg := args[i]
 			if arg == "--worktree" || arg == "-w" {
 				if i+1 >= len(args) {
-					fmt.Println("Error: --worktree/-w 需要一个参数")
+					fmt.Println("Error: --worktree/-w requires an argument")
 					os.Exit(1)
 				}
 				targetWorktree = args[i+1]
@@ -116,15 +116,15 @@ var runCmd = &cobra.Command{
 		}
 
 		if len(commandArgs) == 0 {
-			fmt.Println("Error: 需要指定要执行的命令")
-			fmt.Println("用法: orion run <command> [args...]")
+			fmt.Println("Error: A command must be specified")
+			fmt.Println("Usage: orion run <command> [args...]")
 			os.Exit(1)
 		}
 
 		// 找到 workspace root
 		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Printf("Error: 获取当前目录失败: %v\n", err)
+			fmt.Printf("Error: Failed to get current directory: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -136,7 +136,7 @@ var runCmd = &cobra.Command{
 
 		wm, err := workspace.NewManager(rootPath)
 		if err != nil {
-			fmt.Printf("Error: 加载 workspace 失败: %v\n", err)
+			fmt.Printf("Error: Failed to load workspace: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -149,9 +149,9 @@ var runCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// 验证目录存在
+		// Verify directory exists
 		if _, err := os.Stat(execDir); os.IsNotExist(err) {
-			fmt.Printf("Error: 执行目录不存在: %s\n", execDir)
+			fmt.Printf("Error: Execution directory does not exist: %s\n", execDir)
 			os.Exit(1)
 		}
 
@@ -172,12 +172,12 @@ var runCmd = &cobra.Command{
 		err = command.Run()
 		if err != nil {
 			if exitErr, ok := err.(*exec.ExitError); ok {
-				// 命令返回非零退出码
+				// Command returned non-zero exit code
 				if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
 					os.Exit(status.ExitStatus())
 				}
 			}
-			fmt.Fprintf(os.Stderr, "Error: 执行命令失败: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: Failed to execute command: %v\n", err)
 			os.Exit(1)
 		}
 	},
@@ -186,9 +186,9 @@ var runCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(runCmd)
 
-	// 注意：由于 DisableFlagParsing=true，这里的 flag 定义仅用于帮助文档生成
-	// 实际解析在 Run 函数中手动处理
-	runCmd.Flags().StringVarP(&runWorktree, "worktree", "w", "", "指定要在哪个 node 的 worktree 中执行命令")
+	// Note: Since DisableFlagParsing=true, this flag definition is only for help documentation generation
+	// Actual parsing is handled manually in the Run function
+	runCmd.Flags().StringVarP(&runWorktree, "worktree", "w", "", "Specify which node's worktree to execute the command in")
 }
 
 // GetRunWorktreePath 是一个辅助函数，用于获取 run 命令的执行目录

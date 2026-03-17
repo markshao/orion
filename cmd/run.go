@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"syscall"
 
 	"orion/internal/workspace"
@@ -15,6 +17,52 @@ var (
 	// runWorktree 指定要在哪个 worktree 中执行命令（可选）
 	runWorktree string
 )
+
+// isSubDir checks if child is a subdirectory of parent (or the same directory)
+func isSubDir(parent, child string) bool {
+	// Resolve symlinks
+	absParent, err := filepath.EvalSymlinks(parent)
+	if err != nil {
+		absParent = parent
+	}
+
+	absChild, err := filepath.EvalSymlinks(child)
+	if err != nil {
+		absChild = child
+	}
+
+	rel, err := filepath.Rel(absParent, absChild)
+	if err != nil {
+		return false
+	}
+
+	// rel == "." -> same dir
+	// rel starts with ".." -> outside
+	return rel == "." || (!strings.HasPrefix(rel, "..") && !strings.HasPrefix(rel, "/"))
+}
+
+// determineExecDir determines the execution directory and target worktree name
+// based on current working directory and user input
+func determineExecDir(wm *workspace.WorkspaceManager, cwd string, targetWorktree string) (string, string, error) {
+	// If user specified a worktree context
+	if targetWorktree != "" {
+		node, exists := wm.State.Nodes[targetWorktree]
+		if !exists {
+			return "", "", fmt.Errorf("node '%s' does not exist", targetWorktree)
+		}
+
+		// If we are already inside the target worktree (e.g. sub-directory), stay there
+		if isSubDir(node.WorktreePath, cwd) {
+			return cwd, targetWorktree, nil
+		}
+		// Otherwise switch to the root of the worktree
+		return node.WorktreePath, targetWorktree, nil
+	}
+
+	// Default to Main Repo Root (No -w specified)
+	// ALWAYS run in main_repo root, regardless of current directory.
+	return wm.State.RepoPath, "", nil
+}
 
 // runCmd represents the run command
 var runCmd = &cobra.Command{
@@ -94,17 +142,11 @@ var runCmd = &cobra.Command{
 
 		// 确定执行目录
 		var execDir string
-		if targetWorktree != "" {
-			// 在指定的 worktree 中执行
-			node, exists := wm.State.Nodes[targetWorktree]
-			if !exists {
-				fmt.Printf("Error: node '%s' 不存在\n", targetWorktree)
-				os.Exit(1)
-			}
-			execDir = node.WorktreePath
-		} else {
-			// 在 main_repo 中执行
-			execDir = wm.State.RepoPath
+		var worktreeName string
+		execDir, worktreeName, err = determineExecDir(wm, cwd, targetWorktree)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
 		}
 
 		// 验证目录存在
@@ -123,8 +165,8 @@ var runCmd = &cobra.Command{
 		// 设置环境变量，标记当前在 orion run 上下文中
 		command.Env = os.Environ()
 		command.Env = append(command.Env, "ORION_RUN=1")
-		if targetWorktree != "" {
-			command.Env = append(command.Env, fmt.Sprintf("ORION_WORKTREE=%s", targetWorktree))
+		if worktreeName != "" {
+			command.Env = append(command.Env, fmt.Sprintf("ORION_WORKTREE=%s", worktreeName))
 		}
 
 		err = command.Run()

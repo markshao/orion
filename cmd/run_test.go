@@ -351,16 +351,120 @@ func TestRunMultipleArguments(t *testing.T) {
 }
 
 // TestGetRunWorktreePathMainRepo 测试获取 main_repo 路径
-func TestGetRunWorktreePathMainRepo(t *testing.T) {
+func TestDetermineExecDir(t *testing.T) {
+	// Setup workspace
 	rootPath, repoPath, cleanup := setupTestWorkspaceForRun(t)
 	defer cleanup()
 
-	// 测试获取 main_repo 路径
-	path, err := GetRunWorktreePath(rootPath, "")
-	if err != nil {
-		t.Fatalf("GetRunWorktreePath failed: %v", err)
+	wm, _ := workspace.NewManager(rootPath)
+
+	// Create a node
+	nodeName := "test-node"
+	if err := wm.SpawnNode(nodeName, "feature/test", "main", "test", true); err != nil {
+		t.Fatalf("failed to spawn node: %v", err)
 	}
-	if path != repoPath {
-		t.Errorf("expected %s, got %s", repoPath, path)
+	nodePath := wm.State.Nodes[nodeName].WorktreePath
+
+	// Create directories needed for test
+	if err := os.MkdirAll(filepath.Join(repoPath, "subdir"), 0755); err != nil {
+		t.Fatalf("failed to create repo subdir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(nodePath, "src"), 0755); err != nil {
+		t.Fatalf("failed to create node subdir: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		cwd            string
+		targetWorktree string
+		wantExecDir    string
+		wantWorktree   string
+		wantErr        bool
+	}{
+		{
+			name:           "Inside main repo, no target",
+			cwd:            repoPath,
+			targetWorktree: "",
+			wantExecDir:    repoPath,
+			wantWorktree:   "",
+			wantErr:        false,
+		},
+		{
+			name:           "Inside main repo subdir, no target",
+			cwd:            filepath.Join(repoPath, "subdir"),
+			targetWorktree: "",
+			wantExecDir:    repoPath, // Changed: Always repo root
+			wantWorktree:   "",
+			wantErr:        false,
+		},
+		{
+			name:           "Outside repo (workspace root), no target",
+			cwd:            rootPath,
+			targetWorktree: "",
+			wantExecDir:    repoPath, // Defaults to repo root
+			wantWorktree:   "",
+			wantErr:        false,
+		},
+		{
+			name:           "Inside node, no target",
+			cwd:            nodePath,
+			targetWorktree: "",
+			wantExecDir:    repoPath, // Changed: Defaults to repo root
+			wantWorktree:   "",
+			wantErr:        false,
+		},
+		{
+			name:           "Inside node subdir, no target",
+			cwd:            filepath.Join(nodePath, "src"),
+			targetWorktree: "",
+			wantExecDir:    repoPath, // Changed: Defaults to repo root
+			wantWorktree:   "",
+			wantErr:        false,
+		},
+		{
+			name:           "Inside main repo, target node",
+			cwd:            repoPath,
+			targetWorktree: nodeName,
+			wantExecDir:    nodePath, // Switches to node root
+			wantWorktree:   nodeName,
+			wantErr:        false,
+		},
+		{
+			name:           "Inside node subdir, target same node",
+			cwd:            filepath.Join(nodePath, "src"),
+			targetWorktree: nodeName,
+			wantExecDir:    filepath.Join(nodePath, "src"), // Stays in subdir
+			wantWorktree:   nodeName,
+			wantErr:        false,
+		},
+		{
+			name:           "Inside node, target invalid node",
+			cwd:            nodePath,
+			targetWorktree: "invalid",
+			wantExecDir:    "",
+			wantWorktree:   "",
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotExecDir, gotWorktree, err := determineExecDir(wm, tt.cwd, tt.targetWorktree)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("determineExecDir() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				// Handle potential symlinks in comparison
+				gotEval, _ := filepath.EvalSymlinks(gotExecDir)
+				wantEval, _ := filepath.EvalSymlinks(tt.wantExecDir)
+				if gotEval != wantEval {
+					t.Errorf("determineExecDir() execDir = %v, want %v", gotExecDir, tt.wantExecDir)
+				}
+				if gotWorktree != tt.wantWorktree {
+					t.Errorf("determineExecDir() worktree = %v, want %v", gotWorktree, tt.wantWorktree)
+				}
+			}
+		})
 	}
 }

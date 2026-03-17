@@ -35,65 +35,83 @@ func TestNodeStatusConstants(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if string(tt.status) != tt.expected {
-				t.Errorf("expected %q, got %q", tt.expected, tt.status)
+				t.Errorf("expected %s, got %s", tt.expected, tt.status)
 			}
 		})
 	}
 }
 
-func TestNodeStatusComparison(t *testing.T) {
-	// Test that different statuses are not equal
-	if StatusWorking == StatusReadyToPush {
-		t.Error("StatusWorking should not equal StatusReadyToPush")
+func TestNodeStatusType(t *testing.T) {
+	// Test that NodeStatus is a string-based type
+	var status NodeStatus = "CUSTOM_STATUS"
+	if status != "CUSTOM_STATUS" {
+		t.Errorf("expected CUSTOM_STATUS, got %s", status)
 	}
-	if StatusWorking == StatusFail {
-		t.Error("StatusWorking should not equal StatusFail")
-	}
-	if StatusWorking == StatusPushed {
-		t.Error("StatusWorking should not equal StatusPushed")
-	}
-	if StatusReadyToPush == StatusFail {
-		t.Error("StatusReadyToPush should not equal StatusFail")
-	}
-	if StatusReadyToPush == StatusPushed {
-		t.Error("StatusReadyToPush should not equal StatusPushed")
-	}
-	if StatusFail == StatusPushed {
-		t.Error("StatusFail should not equal StatusPushed")
+
+	// Test empty status
+	var emptyStatus NodeStatus
+	if emptyStatus != "" {
+		t.Errorf("expected empty string for zero value, got %s", emptyStatus)
 	}
 }
 
 func TestNodeWithStatus(t *testing.T) {
-	node := Node{
-		Name:          "test-node",
-		LogicalBranch: "feature/test",
-		BaseBranch:    "main",
-		ShadowBranch:  "orion-shadow/test-node/feature/test",
-		WorktreePath:  "/tmp/test",
-		Label:         "test",
-		CreatedBy:     "user",
-		Status:        StatusWorking,
+	tests := []struct {
+		name           string
+		node           Node
+		expectedStatus NodeStatus
+	}{
+		{
+			name: "Node with WORKING status",
+			node: Node{
+				Name:          "test-node",
+				LogicalBranch: "feature/test",
+				Status:        StatusWorking,
+			},
+			expectedStatus: StatusWorking,
+		},
+		{
+			name: "Node with READY_TO_PUSH status",
+			node: Node{
+				Name:          "test-node",
+				LogicalBranch: "feature/test",
+				Status:        StatusReadyToPush,
+			},
+			expectedStatus: StatusReadyToPush,
+		},
+		{
+			name: "Node with FAIL status",
+			node: Node{
+				Name:          "test-node",
+				LogicalBranch: "feature/test",
+				Status:        StatusFail,
+			},
+			expectedStatus: StatusFail,
+		},
+		{
+			name: "Node with PUSHED status",
+			node: Node{
+				Name:          "test-node",
+				LogicalBranch: "feature/test",
+				Status:        StatusPushed,
+			},
+			expectedStatus: StatusPushed,
+		},
+		{
+			name: "Node with empty status (legacy)",
+			node: Node{
+				Name:          "test-node",
+				LogicalBranch: "feature/test",
+			},
+			expectedStatus: "",
+		},
 	}
 
-	if node.Status != StatusWorking {
-		t.Errorf("expected StatusWorking, got %v", node.Status)
-	}
-
-	// Test status update
-	node.Status = StatusReadyToPush
-	if node.Status != StatusReadyToPush {
-		t.Errorf("expected StatusReadyToPush after update, got %v", node.Status)
-	}
-
-	// Test empty status (legacy node)
-	legacyNode := Node{
-		Name:          "legacy-node",
-		LogicalBranch: "feature/legacy",
-		ShadowBranch:  "feature/legacy",
-		WorktreePath:  "/tmp/legacy",
-	}
-
-	if legacyNode.Status != "" {
-		t.Errorf("expected empty status for legacy node, got %v", legacyNode.Status)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.node.Status != tt.expectedStatus {
+				t.Errorf("expected status %s, got %s", tt.expectedStatus, tt.node.Status)
+			}
+		})
 	}
 }

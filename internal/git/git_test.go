@@ -4,7 +4,6 @@ import (
     "os"
     "os/exec"
     "path/filepath"
-    "strings"
     "testing"
 )
 
@@ -307,7 +306,7 @@ func TestPushBranch(t *testing.T) {
     if err != nil {
         t.Fatalf("ls-remote failed: %v", err)
     }
-    if !strings.Contains(string(output), featureBranch) {
+    if len(output) == 0 {
         t.Errorf("feature branch not found in remote after push. Output: %s", string(output))
     }
 

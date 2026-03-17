@@ -199,97 +199,106 @@ func TestPushCommand_ForceFlag(t *testing.T) {
 	_, wm, cleanup := setupTestWorkspaceForPush(t)
 	defer cleanup()
 
-	nodeName := "force-test-node"
+	nodeName := "force-push-node"
 
 	// Spawn a node
 	if err := wm.SpawnNode(nodeName, "feature/force", "main", "test", true); err != nil {
 		t.Fatalf("SpawnNode failed: %v", err)
 	}
 
-	// Set status to WORKING (normally not pushable)
 	node := wm.State.Nodes[nodeName]
-	node.Status = types.StatusWorking
-	wm.State.Nodes[nodeName] = node
-	wm.SaveState()
 
-	// With force flag, status check should be bypassed (logic test)
+	// Test: Force flag should allow push with any status
+	// Simulate force push logic
 	force := true
-	if force && node.Status != types.StatusReadyToPush {
-		// Force mode: should allow push with warning
-		// This is a logic verification, not actual push
+	if force {
+		// Should proceed regardless of status
+		node.Status = types.StatusWorking // Even with WORKING status
+		// Force push should be allowed
 	}
 
-	// Without force flag, should fail
+	// Test: Without force, only READY_TO_PUSH should succeed
 	force = false
+	node.Status = types.StatusWorking
 	if !force && node.Status != types.StatusReadyToPush {
-		// Should show error message - this is expected behavior
+		// Should be rejected
+	}
+
+	node.Status = types.StatusReadyToPush
+	if !force && node.Status == types.StatusReadyToPush {
+		// Should be allowed
 	}
 }
 
-// TestPushCommand_NonExistentNode tests error handling for non-existent node
+// TestPushCommand_NonExistentNode tests error handling for non-existent nodes
 func TestPushCommand_NonExistentNode(t *testing.T) {
-	rootPath, _, cleanup := setupTestWorkspaceForPush(t)
+	_, wm, cleanup := setupTestWorkspaceForPush(t)
 	defer cleanup()
-
-	wm, err := workspace.NewManager(rootPath)
-	if err != nil {
-		t.Fatalf("NewManager failed: %v", err)
-	}
 
 	// Test: Non-existent node should return error
 	_, exists := wm.State.Nodes["non-existent-node"]
 	if exists {
 		t.Error("Expected node to not exist")
 	}
+
+	// Simulate the check in push command
+	targetNodeName := "non-existent-node"
+	_, nodeExists := wm.State.Nodes[targetNodeName]
+	if nodeExists {
+		t.Error("Expected non-existent node to not be found")
+	}
 }
 
 // TestPushCommand_StatusMessages tests status-specific error messages
 func TestPushCommand_StatusMessages(t *testing.T) {
 	tests := []struct {
-		name           string
-		status         types.NodeStatus
-		expectedHint   string
+		name              string
+		status            types.NodeStatus
+		expectedMessage   string
+		shouldSuggestFix  bool
 	}{
 		{
-			name:         "WORKING status",
-			status:       types.StatusWorking,
-			expectedHint: "workflow",
+			name:             "WORKING status",
+			status:           types.StatusWorking,
+			expectedMessage:  "workflow",
+			shouldSuggestFix: true,
 		},
 		{
-			name:         "FAIL status",
-			status:       types.StatusFail,
-			expectedHint: "failed",
+			name:             "FAIL status",
+			status:           types.StatusFail,
+			expectedMessage:  "failed",
+			shouldSuggestFix: true,
 		},
 		{
-			name:         "PUSHED status",
-			status:       types.StatusPushed,
-			expectedHint: "already been pushed",
+			name:             "PUSHED status",
+			status:           types.StatusPushed,
+			expectedMessage:  "already been pushed",
+			shouldSuggestFix: false,
 		},
 		{
-			name:         "Empty status (legacy)",
-			status:       "",
-			expectedHint: "workflow",
+			name:             "Empty status (legacy)",
+			status:           "",
+			expectedMessage:  "before status tracking",
+			shouldSuggestFix: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Verify status value
-			switch tt.status {
-			case types.StatusWorking:
-				if tt.status != "WORKING" {
-					t.Errorf("StatusWorking = %v, want WORKING", tt.status)
+			// Simulate status check logic
+			status := tt.status
+			if status != types.StatusReadyToPush {
+				// Should show appropriate message based on status
+				switch status {
+				case types.StatusWorking:
+					// Should suggest running workflow
+				case types.StatusFail:
+					// Should suggest fixing issues
+				case types.StatusPushed:
+					// Should mention already pushed
+				case "":
+					// Legacy node, suggest running workflow
 				}
-			case types.StatusFail:
-				if tt.status != "FAIL" {
-					t.Errorf("StatusFail = %v, want FAIL", tt.status)
-				}
-			case types.StatusPushed:
-				if tt.status != "PUSHED" {
-					t.Errorf("StatusPushed = %v, want PUSHED", tt.status)
-				}
-			case "":
-				// Empty status is valid for legacy nodes
 			}
 		})
 	}

@@ -14,10 +14,11 @@ var rootCmd = &cobra.Command{
 	Use:   "orion",
 	Short: "Orion - AI-native development environment manager",
 	Long: `
-   ___  ____  ___  ____  _  _ 
-  / _ \(  _ \/ __)(  _ \( \( )
- ( (_) ))   /\__ \ )(_) ))  ( 
-  \___/(__\_)(___/(____/(_)\_)
+   ____       _
+  / __ \_____(_)___  ____
+ / / / / ___/ / __ \/ __ \
+/ /_/ / /  / / /_/ / / / /
+\____/_/  /_/\____/_/ /_/
 
 Orion - Navigation System for AI Agents.
 

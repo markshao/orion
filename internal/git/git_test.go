@@ -4,6 +4,7 @@ import (
     "os"
     "os/exec"
     "path/filepath"
+    "strings"
     "testing"
 )
 
@@ -223,5 +224,76 @@ func TestGetCurrentBranch(t *testing.T) {
     if br != "main" {
         t.Errorf("unexpected current branch: got %q, want %q", br, "main")
     }
+}
+
+func TestPushBranch(t *testing.T) {
+    // Create a temp repo to act as "remote"
+    remoteDir, err := os.MkdirTemp("", "orion-remote-test")
+    if err != nil {
+        t.Fatalf("failed to create temp remote dir: %v", err)
+    }
+    defer os.RemoveAll(remoteDir)
+
+    // Initialize bare repo as remote
+    exec.Command("git", "init", "--bare", remoteDir).Run()
+
+    // Create a local repo with a remote pointing to remoteDir
+    localDir, err := os.MkdirTemp("", "orion-local-test")
+    if err != nil {
+        t.Fatalf("failed to create temp local dir: %v", err)
+    }
+    defer os.RemoveAll(localDir)
+
+    exec.Command("git", "init", localDir).Run()
+    exec.Command("git", "-C", localDir, "config", "user.email", "test@example.com").Run()
+    exec.Command("git", "-C", localDir, "config", "user.name", "Test User").Run()
+    exec.Command("git", "-C", localDir, "checkout", "-b", "main").Run()
+
+    // Create initial commit
+    readme := filepath.Join(localDir, "README.md")
+    os.WriteFile(readme, []byte("# Test Repo"), 0644)
+    exec.Command("git", "-C", localDir, "add", ".").Run()
+    exec.Command("git", "-C", localDir, "commit", "-m", "Initial commit").Run()
+
+    // Add remote
+    exec.Command("git", "-C", localDir, "remote", "add", "origin", remoteDir).Run()
+
+    // Test 1: Push a new branch
+    branchToPush := "feature/test-push"
+    exec.Command("git", "-C", localDir, "branch", branchToPush, "main").Run()
+
+    if err := PushBranch(localDir, branchToPush); err != nil {
+        t.Fatalf("PushBranch failed: %v", err)
+    }
+
+    // Verify the branch exists in remote
+    out, err := exec.Command("git", "--git-dir", remoteDir, "branch").CombinedOutput()
+    if err != nil {
+        t.Fatalf("failed to list remote branches: %v", err)
+    }
+    if !containsBranch(string(out), branchToPush) {
+        t.Errorf("branch %s was not pushed to remote", branchToPush)
+    }
+
+    // Test 2: Push non-existent branch should fail
+    if err := PushBranch(localDir, "non-existent-branch"); err == nil {
+        t.Errorf("PushBranch with non-existent branch should fail")
+    }
+}
+
+// Helper function to check if a branch exists in git branch output
+func containsBranch(output string, branch string) bool {
+    // Git branch output format: "* main\n  feature/test\n"
+    // We need to handle both current branch (*) and others
+    lines := strings.Split(output, "\n")
+    for _, line := range lines {
+        line = strings.TrimSpace(line)
+        line = strings.TrimPrefix(line, "*")
+        line = strings.TrimSpace(line)
+        if line == branch {
+            return true
+        }
+    }
+    return false
 }
 

@@ -449,3 +449,73 @@ func TestAppliedRunsPersistence(t *testing.T) {
 		t.Errorf("AppliedRuns content mismatch: %v", loadedNode.AppliedRuns)
 	}
 }
+
+func TestUpdateNodeStatus(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
+	defer cleanup()
+
+	nodeName := "test-node-status"
+	logicalBranch := "feature/status-test"
+
+	// 1. Spawn Node (should have WORKING status by default)
+	err := wm.SpawnNode(nodeName, logicalBranch, "main", "Testing status", true)
+	if err != nil {
+		t.Fatalf("SpawnNode failed: %v", err)
+	}
+
+	// 2. Verify initial status is WORKING
+	node := wm.State.Nodes[nodeName]
+	if node.Status != types.StatusWorking {
+		t.Errorf("Expected initial status to be WORKING, got %q", node.Status)
+	}
+
+	// 3. Update status to READY_TO_PUSH
+	err = wm.UpdateNodeStatus(nodeName, types.StatusReadyToPush)
+	if err != nil {
+		t.Fatalf("UpdateNodeStatus failed: %v", err)
+	}
+
+	// 4. Verify status updated in memory
+	node = wm.State.Nodes[nodeName]
+	if node.Status != types.StatusReadyToPush {
+		t.Errorf("Expected status to be READY_TO_PUSH, got %q", node.Status)
+	}
+
+	// 5. Reload manager and verify persistence
+	wm2, err := NewManager(wm.RootPath)
+	if err != nil {
+		t.Fatalf("Failed to reload manager: %v", err)
+	}
+
+	loadedNode, exists := wm2.State.Nodes[nodeName]
+	if !exists {
+		t.Fatalf("Node not found after reload")
+	}
+
+	if loadedNode.Status != types.StatusReadyToPush {
+		t.Errorf("Expected persisted status to be READY_TO_PUSH, got %q", loadedNode.Status)
+	}
+
+	// 6. Test updating to other statuses
+	for _, status := range []types.NodeStatus{types.StatusFail, types.StatusPushed} {
+		err = wm.UpdateNodeStatus(nodeName, status)
+		if err != nil {
+			t.Errorf("UpdateNodeStatus to %s failed: %v", status, err)
+		}
+
+		node = wm.State.Nodes[nodeName]
+		if node.Status != status {
+			t.Errorf("Expected status to be %s, got %q", status, node.Status)
+		}
+	}
+}
+
+func TestUpdateNodeStatusNonExistentNode(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
+	defer cleanup()
+
+	err := wm.UpdateNodeStatus("non-existent-node", types.StatusReadyToPush)
+	if err == nil {
+		t.Errorf("Expected error for non-existent node, got nil")
+	}
+}

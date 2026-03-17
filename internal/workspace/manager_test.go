@@ -407,6 +407,88 @@ func TestFindNodeByPath(t *testing.T) {
 	}
 }
 
+func TestUpdateNodeStatus(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
+	defer cleanup()
+
+	nodeName := "status-test-node"
+
+	// 1. Spawn Node
+	err := wm.SpawnNode(nodeName, "feature/status", "main", "Status test", true)
+	if err != nil {
+		t.Fatalf("SpawnNode failed: %v", err)
+	}
+
+	// 2. Verify initial status is WORKING
+	node := wm.State.Nodes[nodeName]
+	if node.Status != types.StatusWorking {
+		t.Errorf("Expected initial status WORKING, got %v", node.Status)
+	}
+
+	// 3. Update status to READY_TO_PUSH
+	err = wm.UpdateNodeStatus(nodeName, types.StatusReadyToPush)
+	if err != nil {
+		t.Fatalf("UpdateNodeStatus failed: %v", err)
+	}
+
+	// 4. Verify status updated in memory
+	node = wm.State.Nodes[nodeName]
+	if node.Status != types.StatusReadyToPush {
+		t.Errorf("Expected status READY_TO_PUSH, got %v", node.Status)
+	}
+
+	// 5. Reload manager and verify persistence
+	wm2, err := NewManager(wm.RootPath)
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	loadedNode := wm2.State.Nodes[nodeName]
+	if loadedNode.Status != types.StatusReadyToPush {
+		t.Errorf("Expected persisted status READY_TO_PUSH, got %v", loadedNode.Status)
+	}
+
+	// 6. Test status transitions
+	statusTransitions := []struct {
+		from types.NodeStatus
+		to   types.NodeStatus
+	}{
+		{types.StatusReadyToPush, types.StatusFail},
+		{types.StatusFail, types.StatusWorking},
+		{types.StatusWorking, types.StatusReadyToPush},
+		{types.StatusReadyToPush, types.StatusPushed},
+	}
+
+	for _, tt := range statusTransitions {
+		// Set initial status
+		node.Status = tt.from
+		wm.State.Nodes[nodeName] = node
+		wm.SaveState()
+
+		// Update to target status
+		err = wm.UpdateNodeStatus(nodeName, tt.to)
+		if err != nil {
+			t.Errorf("UpdateNodeStatus from %v to %v failed: %v", tt.from, tt.to, err)
+			continue
+		}
+
+		// Verify
+		node = wm.State.Nodes[nodeName]
+		if node.Status != tt.to {
+			t.Errorf("Expected status %v after transition from %v, got %v", tt.to, tt.from, node.Status)
+		}
+	}
+
+	// 7. Test UpdateNodeStatus with non-existent node
+	err = wm.UpdateNodeStatus("non-existent-node", types.StatusPushed)
+	if err == nil {
+		t.Error("Expected error for non-existent node")
+	}
+	if !strings.Contains(err.Error(), "does not exist") {
+		t.Errorf("Error message should mention 'does not exist': %v", err)
+	}
+}
+
 func TestAppliedRunsPersistence(t *testing.T) {
 	wm, cleanup := setupTestWorkspace(t)
 	defer cleanup()
@@ -447,119 +529,5 @@ func TestAppliedRunsPersistence(t *testing.T) {
 	}
 	if loadedNode.AppliedRuns[0] != "run-1" || loadedNode.AppliedRuns[1] != "run-2" {
 		t.Errorf("AppliedRuns content mismatch: %v", loadedNode.AppliedRuns)
-	}
-}
-
-func TestUpdateNodeStatus(t *testing.T) {
-	wm, cleanup := setupTestWorkspace(t)
-	defer cleanup()
-
-	nodeName := "test-node-status"
-	logicalBranch := "feature/status-test"
-
-	// 1. Spawn Node (should have StatusWorking by default)
-	err := wm.SpawnNode(nodeName, logicalBranch, "main", "Testing status", true)
-	if err != nil {
-		t.Fatalf("SpawnNode failed: %v", err)
-	}
-
-	// Verify initial status is StatusWorking
-	node, exists := wm.State.Nodes[nodeName]
-	if !exists {
-		t.Fatalf("Node not found after spawn")
-	}
-	if node.Status != types.StatusWorking {
-		t.Errorf("Expected initial status to be WORKING, got %s", node.Status)
-	}
-
-	// 2. Update status to READY_TO_PUSH
-	err = wm.UpdateNodeStatus(nodeName, types.StatusReadyToPush)
-	if err != nil {
-		t.Fatalf("UpdateNodeStatus(READY_TO_PUSH) failed: %v", err)
-	}
-
-	node, exists = wm.State.Nodes[nodeName]
-	if !exists {
-		t.Fatalf("Node not found after status update")
-	}
-	if node.Status != types.StatusReadyToPush {
-		t.Errorf("Expected status to be READY_TO_PUSH, got %s", node.Status)
-	}
-
-	// 3. Update status to PUSHED
-	err = wm.UpdateNodeStatus(nodeName, types.StatusPushed)
-	if err != nil {
-		t.Fatalf("UpdateNodeStatus(PUSHED) failed: %v", err)
-	}
-
-	node, exists = wm.State.Nodes[nodeName]
-	if !exists {
-		t.Fatalf("Node not found after status update")
-	}
-	if node.Status != types.StatusPushed {
-		t.Errorf("Expected status to be PUSHED, got %s", node.Status)
-	}
-
-	// 4. Update status to FAIL
-	err = wm.UpdateNodeStatus(nodeName, types.StatusFail)
-	if err != nil {
-		t.Fatalf("UpdateNodeStatus(FAIL) failed: %v", err)
-	}
-
-	node, exists = wm.State.Nodes[nodeName]
-	if !exists {
-		t.Fatalf("Node not found after status update")
-	}
-	if node.Status != types.StatusFail {
-		t.Errorf("Expected status to be FAIL, got %s", node.Status)
-	}
-
-	// 5. Verify persistence by reloading
-	wm2, err := NewManager(wm.RootPath)
-	if err != nil {
-		t.Fatalf("Failed to reload manager: %v", err)
-	}
-
-	loadedNode, exists := wm2.State.Nodes[nodeName]
-	if !exists {
-		t.Fatalf("Node not found after reload")
-	}
-	if loadedNode.Status != types.StatusFail {
-		t.Errorf("Expected persisted status to be FAIL, got %s", loadedNode.Status)
-	}
-}
-
-func TestUpdateNodeStatusNonExistentNode(t *testing.T) {
-	wm, cleanup := setupTestWorkspace(t)
-	defer cleanup()
-
-	// Try to update status of non-existent node
-	err := wm.UpdateNodeStatus("non-existent-node", types.StatusReadyToPush)
-	if err == nil {
-		t.Errorf("Expected error when updating non-existent node status")
-	}
-}
-
-func TestSpawnNodeSetsInitialStatus(t *testing.T) {
-	wm, cleanup := setupTestWorkspace(t)
-	defer cleanup()
-
-	nodeName := "test-initial-status"
-	logicalBranch := "feature/initial"
-
-	// Spawn node
-	err := wm.SpawnNode(nodeName, logicalBranch, "main", "Test", true)
-	if err != nil {
-		t.Fatalf("SpawnNode failed: %v", err)
-	}
-
-	// Verify initial status is WORKING
-	node, exists := wm.State.Nodes[nodeName]
-	if !exists {
-		t.Fatalf("Node not found")
-	}
-
-	if node.Status != types.StatusWorking {
-		t.Errorf("Expected initial status to be WORKING, got %s", node.Status)
 	}
 }

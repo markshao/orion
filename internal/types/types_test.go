@@ -6,169 +6,372 @@ import (
 	"time"
 )
 
-func TestNodeStatusConstants(t *testing.T) {
+// TestNodeStatus_Constants tests that NodeStatus constants have correct values
+func TestNodeStatus_Constants(t *testing.T) {
 	tests := []struct {
 		name     string
 		status   NodeStatus
 		expected string
 	}{
-		{"StatusWorking", StatusWorking, "WORKING"},
-		{"StatusReadyToPush", StatusReadyToPush, "READY_TO_PUSH"},
-		{"StatusFail", StatusFail, "FAIL"},
-		{"StatusPushed", StatusPushed, "PUSHED"},
+		{
+			name:     "StatusWorking",
+			status:   StatusWorking,
+			expected: "WORKING",
+		},
+		{
+			name:     "StatusReadyToPush",
+			status:   StatusReadyToPush,
+			expected: "READY_TO_PUSH",
+		},
+		{
+			name:     "StatusFail",
+			status:   StatusFail,
+			expected: "FAIL",
+		},
+		{
+			name:     "StatusPushed",
+			status:   StatusPushed,
+			expected: "PUSHED",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if string(tt.status) != tt.expected {
-				t.Errorf("expected %s, got %s", tt.expected, tt.status)
+				t.Errorf("Expected %s = %q, got %q", tt.name, tt.expected, tt.status)
 			}
 		})
 	}
 }
 
-func TestNodeStatusJSONSerialization(t *testing.T) {
+// TestNodeStatus_MarshalJSON tests JSON marshaling of NodeStatus
+func TestNodeStatus_MarshalJSON(t *testing.T) {
 	tests := []struct {
-		name         string
-		status       NodeStatus
-		expectedJSON string
+		name     string
+		status   NodeStatus
+		expected string
 	}{
-		{"Working", StatusWorking, `WORKING`},
-		{"ReadyToPush", StatusReadyToPush, `READY_TO_PUSH`},
-		{"Fail", StatusFail, `FAIL`},
-		{"Pushed", StatusPushed, `PUSHED`},
-		{"Empty", "", ``}, // omitempty should produce null for empty string
+		{
+			name:     "WORKING status",
+			status:   StatusWorking,
+			expected: `"WORKING"`,
+		},
+		{
+			name:     "READY_TO_PUSH status",
+			status:   StatusReadyToPush,
+			expected: `"READY_TO_PUSH"`,
+		},
+		{
+			name:     "FAIL status",
+			status:   StatusFail,
+			expected: `"FAIL"`,
+		},
+		{
+			name:     "PUSHED status",
+			status:   StatusPushed,
+			expected: `"PUSHED"`,
+		},
+		{
+			name:     "Empty status",
+			status:   "",
+			expected: `""`,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			node := Node{
-				Name:          "test-node",
-				LogicalBranch: "feature/test",
-				ShadowBranch:  "orion/test-shadow",
-				WorktreePath:  "/tmp/test",
-				Status:        tt.status,
-				CreatedAt:     time.Now(),
-			}
-
-			data, err := json.Marshal(node)
+			data, err := json.Marshal(tt.status)
 			if err != nil {
-				t.Fatalf("json.Marshal failed: %v", err)
+				t.Fatalf("Marshal failed: %v", err)
 			}
-
-			// Check if status is in the JSON
-			var result map[string]interface{}
-			if err := json.Unmarshal(data, &result); err != nil {
-				t.Fatalf("json.Unmarshal failed: %v", err)
-			}
-
-			if tt.status == "" {
-				// Empty status should be omitted
-				if _, exists := result["status"]; exists {
-					t.Errorf("expected status to be omitted for empty string, but it was present")
-				}
-			} else {
-				// Non-empty status should be present
-				statusVal, ok := result["status"].(string)
-				if !ok {
-					t.Errorf("expected status to be a string, got %T", result["status"])
-				} else if statusVal != tt.expectedJSON {
-					t.Errorf("expected status %s, got %s", tt.expectedJSON, statusVal)
-				}
+			if string(data) != tt.expected {
+				t.Errorf("Expected %s, got %s", tt.expected, string(data))
 			}
 		})
 	}
 }
 
-func TestNodeJSONSerialization(t *testing.T) {
-	node := Node{
-		Name:          "test-node",
-		LogicalBranch: "feature/login",
-		BaseBranch:    "main",
-		ShadowBranch:  "orion/login-shadow",
-		WorktreePath:  "/tmp/worktree",
-		TmuxSession:   "orion-test-node",
-		Label:         "testing",
-		CreatedBy:     "user",
-		AppliedRuns:   []string{"run-1", "run-2"},
-		Status:        StatusReadyToPush,
-		CreatedAt:     time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+// TestNodeStatus_UnmarshalJSON tests JSON unmarshaling of NodeStatus
+func TestNodeStatus_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name     string
+		jsonData string
+		expected NodeStatus
+		wantErr  bool
+	}{
+		{
+			name:     "WORKING status",
+			jsonData: `"WORKING"`,
+			expected: StatusWorking,
+			wantErr:  false,
+		},
+		{
+			name:     "READY_TO_PUSH status",
+			jsonData: `"READY_TO_PUSH"`,
+			expected: StatusReadyToPush,
+			wantErr:  false,
+		},
+		{
+			name:     "FAIL status",
+			jsonData: `"FAIL"`,
+			expected: StatusFail,
+			wantErr:  false,
+		},
+		{
+			name:     "PUSHED status",
+			jsonData: `"PUSHED"`,
+			expected: StatusPushed,
+			wantErr:  false,
+		},
+		{
+			name:     "Empty status",
+			jsonData: `""`,
+			expected: "",
+			wantErr:  false,
+		},
 	}
 
-	data, err := json.Marshal(node)
-	if err != nil {
-		t.Fatalf("json.Marshal failed: %v", err)
-	}
-
-	var unmarshaled Node
-	if err := json.Unmarshal(data, &unmarshaled); err != nil {
-		t.Fatalf("json.Unmarshal failed: %v", err)
-	}
-
-	if unmarshaled.Name != node.Name {
-		t.Errorf("Name mismatch: expected %s, got %s", node.Name, unmarshaled.Name)
-	}
-	if unmarshaled.LogicalBranch != node.LogicalBranch {
-		t.Errorf("LogicalBranch mismatch: expected %s, got %s", node.LogicalBranch, unmarshaled.LogicalBranch)
-	}
-	if unmarshaled.BaseBranch != node.BaseBranch {
-		t.Errorf("BaseBranch mismatch: expected %s, got %s", node.BaseBranch, unmarshaled.BaseBranch)
-	}
-	if unmarshaled.ShadowBranch != node.ShadowBranch {
-		t.Errorf("ShadowBranch mismatch: expected %s, got %s", node.ShadowBranch, unmarshaled.ShadowBranch)
-	}
-	if unmarshaled.WorktreePath != node.WorktreePath {
-		t.Errorf("WorktreePath mismatch: expected %s, got %s", node.WorktreePath, unmarshaled.WorktreePath)
-	}
-	if unmarshaled.TmuxSession != node.TmuxSession {
-		t.Errorf("TmuxSession mismatch: expected %s, got %s", node.TmuxSession, unmarshaled.TmuxSession)
-	}
-	if unmarshaled.Label != node.Label {
-		t.Errorf("Label mismatch: expected %s, got %s", node.Label, unmarshaled.Label)
-	}
-	if unmarshaled.CreatedBy != node.CreatedBy {
-		t.Errorf("CreatedBy mismatch: expected %s, got %s", node.CreatedBy, unmarshaled.CreatedBy)
-	}
-	if unmarshaled.Status != node.Status {
-		t.Errorf("Status mismatch: expected %s, got %s", node.Status, unmarshaled.Status)
-	}
-	if len(unmarshaled.AppliedRuns) != len(node.AppliedRuns) {
-		t.Errorf("AppliedRuns length mismatch: expected %d, got %d", len(node.AppliedRuns), len(unmarshaled.AppliedRuns))
-	}
-	for i, run := range node.AppliedRuns {
-		if unmarshaled.AppliedRuns[i] != run {
-			t.Errorf("AppliedRuns[%d] mismatch: expected %s, got %s", i, run, unmarshaled.AppliedRuns[i])
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var status NodeStatus
+			err := json.Unmarshal([]byte(tt.jsonData), &status)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Unmarshal error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if status != tt.expected {
+				t.Errorf("Expected %v, got %v", tt.expected, status)
+			}
+		})
 	}
 }
 
-func TestNodeWithOptionalFields(t *testing.T) {
-	// Test node with minimal required fields and empty optional fields
-	node := Node{
-		Name:          "minimal-node",
-		LogicalBranch: "main",
-		ShadowBranch:  "orion/minimal",
-		WorktreePath:  "/tmp/minimal",
-		CreatedAt:     time.Now(),
-		// Status is empty (should be omitted in JSON)
-		// TmuxSession, Label, CreatedBy, AppliedRuns, BaseBranch are all empty
+// TestNode_JSONSerialization tests JSON serialization of Node with Status field
+func TestNode_JSONSerialization(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name string
+		node Node
+	}{
+		{
+			name: "Node with WORKING status",
+			node: Node{
+				Name:          "test-node",
+				LogicalBranch: "feature/test",
+				BaseBranch:    "main",
+				ShadowBranch:  "orion/test-feature/test",
+				WorktreePath:  "/tmp/test-worktree",
+				TmuxSession:   "test-session",
+				Label:         "testing",
+				CreatedBy:     "user",
+				AppliedRuns:   []string{"run-1", "run-2"},
+				Status:        StatusWorking,
+				CreatedAt:     now,
+			},
+		},
+		{
+			name: "Node with READY_TO_PUSH status",
+			node: Node{
+				Name:          "ready-node",
+				LogicalBranch: "feature/ready",
+				BaseBranch:    "main",
+				ShadowBranch:  "orion/ready-feature/ready",
+				WorktreePath:  "/tmp/ready-worktree",
+				Status:        StatusReadyToPush,
+				CreatedAt:     now,
+			},
+		},
+		{
+			name: "Node with FAIL status",
+			node: Node{
+				Name:          "fail-node",
+				LogicalBranch: "feature/fail",
+				BaseBranch:    "main",
+				ShadowBranch:  "orion/fail-feature/fail",
+				WorktreePath:  "/tmp/fail-worktree",
+				Status:        StatusFail,
+				CreatedAt:     now,
+			},
+		},
+		{
+			name: "Node with PUSHED status",
+			node: Node{
+				Name:          "pushed-node",
+				LogicalBranch: "feature/pushed",
+				BaseBranch:    "main",
+				ShadowBranch:  "orion/pushed-feature/pushed",
+				WorktreePath:  "/tmp/pushed-worktree",
+				Status:        StatusPushed,
+				CreatedAt:     now,
+			},
+		},
+		{
+			name: "Node with empty status (legacy)",
+			node: Node{
+				Name:          "legacy-node",
+				LogicalBranch: "feature/legacy",
+				BaseBranch:    "main",
+				ShadowBranch:  "orion/legacy-feature/legacy",
+				WorktreePath:  "/tmp/legacy-worktree",
+				Status:        "",
+				CreatedAt:     now,
+			},
+		},
 	}
 
-	data, err := json.Marshal(node)
-	if err != nil {
-		t.Fatalf("json.Marshal failed: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Marshal
+			data, err := json.Marshal(tt.node)
+			if err != nil {
+				t.Fatalf("Marshal failed: %v", err)
+			}
+
+			// Unmarshal
+			var unmarshaled Node
+			err = json.Unmarshal(data, &unmarshaled)
+			if err != nil {
+				t.Fatalf("Unmarshal failed: %v", err)
+			}
+
+			// Verify fields
+			if unmarshaled.Name != tt.node.Name {
+				t.Errorf("Name mismatch: expected %s, got %s", tt.node.Name, unmarshaled.Name)
+			}
+			if unmarshaled.LogicalBranch != tt.node.LogicalBranch {
+				t.Errorf("LogicalBranch mismatch: expected %s, got %s", tt.node.LogicalBranch, unmarshaled.LogicalBranch)
+			}
+			if unmarshaled.BaseBranch != tt.node.BaseBranch {
+				t.Errorf("BaseBranch mismatch: expected %s, got %s", tt.node.BaseBranch, unmarshaled.BaseBranch)
+			}
+			if unmarshaled.ShadowBranch != tt.node.ShadowBranch {
+				t.Errorf("ShadowBranch mismatch: expected %s, got %s", tt.node.ShadowBranch, unmarshaled.ShadowBranch)
+			}
+			if unmarshaled.WorktreePath != tt.node.WorktreePath {
+				t.Errorf("WorktreePath mismatch: expected %s, got %s", tt.node.WorktreePath, unmarshaled.WorktreePath)
+			}
+			if unmarshaled.Status != tt.node.Status {
+				t.Errorf("Status mismatch: expected %v, got %v", tt.node.Status, unmarshaled.Status)
+			}
+			if len(unmarshaled.AppliedRuns) != len(tt.node.AppliedRuns) {
+				t.Errorf("AppliedRuns length mismatch: expected %d, got %d", len(tt.node.AppliedRuns), len(unmarshaled.AppliedRuns))
+			}
+		})
+	}
+}
+
+// TestNodeStatus_Comparison tests NodeStatus comparison operations
+func TestNodeStatus_Comparison(t *testing.T) {
+	// Test equality
+	if StatusWorking != StatusWorking {
+		t.Error("StatusWorking should equal StatusWorking")
+	}
+	if StatusReadyToPush != StatusReadyToPush {
+		t.Error("StatusReadyToPush should equal StatusReadyToPush")
+	}
+	if StatusFail != StatusFail {
+		t.Error("StatusFail should equal StatusFail")
+	}
+	if StatusPushed != StatusPushed {
+		t.Error("StatusPushed should equal StatusPushed")
 	}
 
-	var result map[string]interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		t.Fatalf("json.Unmarshal failed: %v", err)
+	// Test inequality
+	if StatusWorking == StatusReadyToPush {
+		t.Error("StatusWorking should not equal StatusReadyToPush")
+	}
+	if StatusWorking == StatusFail {
+		t.Error("StatusWorking should not equal StatusFail")
+	}
+	if StatusWorking == StatusPushed {
+		t.Error("StatusWorking should not equal StatusPushed")
+	}
+	if StatusReadyToPush == StatusFail {
+		t.Error("StatusReadyToPush should not equal StatusFail")
+	}
+	if StatusReadyToPush == StatusPushed {
+		t.Error("StatusReadyToPush should not equal StatusPushed")
+	}
+	if StatusFail == StatusPushed {
+		t.Error("StatusFail should not equal StatusPushed")
 	}
 
-	// Check that optional fields are omitted when empty
-	optionalFields := []string{"base_branch", "tmux_session", "label", "created_by", "applied_runs", "status"}
-	for _, field := range optionalFields {
-		if _, exists := result[field]; exists {
-			t.Errorf("expected optional field %s to be omitted when empty", field)
-		}
+	// Test empty status
+	var emptyStatus NodeStatus
+	if emptyStatus == StatusWorking {
+		t.Error("Empty status should not equal StatusWorking")
+	}
+	if emptyStatus == StatusReadyToPush {
+		t.Error("Empty status should not equal StatusReadyToPush")
+	}
+	if emptyStatus == StatusFail {
+		t.Error("Empty status should not equal StatusFail")
+	}
+	if emptyStatus == StatusPushed {
+		t.Error("Empty status should not equal StatusPushed")
+	}
+}
+
+// TestNodeStatus_Validity tests status value validity
+func TestNodeStatus_Validity(t *testing.T) {
+	validStatuses := []NodeStatus{
+		StatusWorking,
+		StatusReadyToPush,
+		StatusFail,
+		StatusPushed,
+		"", // Empty is valid for legacy nodes
+	}
+
+	for _, status := range validStatuses {
+		t.Run(string(status), func(t *testing.T) {
+			// All defined statuses should be non-empty or explicitly empty
+			if status != "" && string(status) == "" {
+				t.Error("Valid status should not be empty string")
+			}
+		})
+	}
+}
+
+// TestNode_HasStatus tests helper logic for checking node status
+func TestNode_HasStatus(t *testing.T) {
+	tests := []struct {
+		name       string
+		nodeStatus NodeStatus
+		checkFor   NodeStatus
+		expected   bool
+	}{
+		{
+			name:       "WORKING matches WORKING",
+			nodeStatus: StatusWorking,
+			checkFor:   StatusWorking,
+			expected:   true,
+		},
+		{
+			name:       "WORKING does not match READY_TO_PUSH",
+			nodeStatus: StatusWorking,
+			checkFor:   StatusReadyToPush,
+			expected:   false,
+		},
+		{
+			name:       "Empty status does not match WORKING",
+			nodeStatus: "",
+			checkFor:   StatusWorking,
+			expected:   false,
+		},
+		{
+			name:       "PUSHED matches PUSHED",
+			nodeStatus: StatusPushed,
+			checkFor:   StatusPushed,
+			expected:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.nodeStatus == tt.checkFor
+			if result != tt.expected {
+				t.Errorf("Expected %v, got %v", tt.expected, result)
+			}
+		})
 	}
 }

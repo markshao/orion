@@ -4,6 +4,7 @@ import (
     "os"
     "os/exec"
     "path/filepath"
+    "strings"
     "testing"
 )
 
@@ -223,5 +224,145 @@ func TestGetCurrentBranch(t *testing.T) {
     if br != "main" {
         t.Errorf("unexpected current branch: got %q, want %q", br, "main")
     }
+}
+
+// setupTestRemoteRepo creates a bare git repo to serve as remote
+func setupTestRemoteRepo(t *testing.T) (repoPath string, remotePath string, cleanup func()) {
+    t.Helper()
+
+    // Create local repo
+    repoPath, repoCleanup := setupTestRepo(t)
+
+    // Create bare remote repo
+    remoteDir, err := os.MkdirTemp("", "orion-remote-test")
+    if err != nil {
+        repoCleanup()
+        t.Fatalf("failed to create temp remote dir: %v", err)
+    }
+
+    cmd := exec.Command("git", "init", "--bare", remoteDir)
+    if output, err := cmd.CombinedOutput(); err != nil {
+        os.RemoveAll(remoteDir)
+        repoCleanup()
+        t.Fatalf("failed to init bare repo: %v, output: %s", err, output)
+    }
+
+    // Add remote to local repo
+    cmd = exec.Command("git", "remote", "add", "origin", remoteDir)
+    cmd.Dir = repoPath
+    if err := cmd.Run(); err != nil {
+        os.RemoveAll(remoteDir)
+        repoCleanup()
+        t.Fatalf("failed to add remote: %v", err)
+    }
+
+    // Push main branch to remote
+    cmd = exec.Command("git", "push", "-u", "origin", "main")
+    cmd.Dir = repoPath
+    if output, err := cmd.CombinedOutput(); err != nil {
+        os.RemoveAll(remoteDir)
+        repoCleanup()
+        t.Fatalf("failed to push to remote: %v, output: %s", err, output)
+    }
+
+    return repoPath, remoteDir, func() {
+        repoCleanup()
+        os.RemoveAll(remoteDir)
+    }
+}
+
+func TestPushBranch(t *testing.T) {
+    repoPath, remotePath, cleanup := setupTestRemoteRepo(t)
+    defer cleanup()
+
+    // Create a new branch with a commit
+    _ = exec.Command("git", "-C", repoPath, "checkout", "-b", "feature/push-test").Run()
+
+    newFile := filepath.Join(repoPath, "feature.txt")
+    if err := os.WriteFile(newFile, []byte("feature content"), 0644); err != nil {
+        t.Fatalf("failed to write feature file: %v", err)
+    }
+
+    _ = exec.Command("git", "-C", repoPath, "add", "feature.txt").Run()
+    _ = exec.Command("git", "-C", repoPath, "config", "user.email", "test@example.com").Run()
+    _ = exec.Command("git", "-C", repoPath, "config", "user.name", "Test").Run()
+    if err := exec.Command("git", "-C", repoPath, "commit", "-m", "Add feature").Run(); err != nil {
+        t.Fatalf("failed to commit on feature branch: %v", err)
+    }
+
+    // Push the branch
+    if err := PushBranch(repoPath, "feature/push-test"); err != nil {
+        t.Fatalf("PushBranch failed: %v", err)
+    }
+
+    // Verify branch exists in remote by cloning to a temp dir
+    cloneDir, err := os.MkdirTemp("", "orion-clone-test")
+    if err != nil {
+        t.Fatalf("failed to create temp clone dir: %v", err)
+    }
+    defer os.RemoveAll(cloneDir)
+
+    cmd := exec.Command("git", "clone", remotePath, cloneDir)
+    if output, err := cmd.CombinedOutput(); err != nil {
+        t.Fatalf("failed to clone remote: %v, output: %s", err, output)
+    }
+
+    // Check if feature branch exists in cloned repo
+    cmd = exec.Command("git", "branch", "-r")
+    cmd.Dir = cloneDir
+    output, err := cmd.Output()
+    if err != nil {
+        t.Fatalf("failed to list remote branches: %v", err)
+    }
+
+    if !containsBranch(string(output), "origin/feature/push-test") {
+        t.Errorf("feature/push-test was not pushed to remote. Remote branches: %s", string(output))
+    }
+}
+
+func TestPushBranchNonExistent(t *testing.T) {
+    repoPath, cleanup := setupTestRepo(t)
+    defer cleanup()
+
+    // Add a remote
+    remoteDir, err := os.MkdirTemp("", "orion-remote-test")
+    if err != nil {
+        t.Fatalf("failed to create temp remote dir: %v", err)
+    }
+    defer os.RemoveAll(remoteDir)
+
+    cmd := exec.Command("git", "init", "--bare", remoteDir)
+    _ = cmd.Run()
+
+    cmd = exec.Command("git", "remote", "add", "origin", remoteDir)
+    cmd.Dir = repoPath
+    _ = cmd.Run()
+
+    // Try to push non-existent branch
+    err = PushBranch(repoPath, "non-existent-branch")
+    if err == nil {
+        t.Error("expected error when pushing non-existent branch")
+    }
+}
+
+func TestPushBranchAlreadyUpToDate(t *testing.T) {
+    repoPath, _, cleanup := setupTestRemoteRepo(t)
+    defer cleanup()
+
+    // Push main branch again (should succeed as already up to date)
+    if err := PushBranch(repoPath, "main"); err != nil {
+        t.Fatalf("PushBranch for already up-to-date branch failed: %v", err)
+    }
+}
+
+// containsBranch checks if the branch list contains the specified branch
+func containsBranch(output, branch string) bool {
+    for _, line := range strings.Split(output, "\n") {
+        line = strings.TrimSpace(line)
+        if line == branch || line == "* "+branch {
+            return true
+        }
+    }
+    return false
 }
 

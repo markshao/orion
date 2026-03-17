@@ -449,3 +449,141 @@ func TestAppliedRunsPersistence(t *testing.T) {
 		t.Errorf("AppliedRuns content mismatch: %v", loadedNode.AppliedRuns)
 	}
 }
+
+func TestUpdateNodeStatus(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
+	defer cleanup()
+
+	nodeName := "test-node-status"
+	logicalBranch := "feature/status-test"
+
+	// 1. Spawn Node - should have StatusWorking by default
+	err := wm.SpawnNode(nodeName, logicalBranch, "main", "Status test", true)
+	if err != nil {
+		t.Fatalf("SpawnNode failed: %v", err)
+	}
+
+	// Verify initial status is StatusWorking
+	node := wm.State.Nodes[nodeName]
+	if node.Status != types.StatusWorking {
+		t.Errorf("Expected initial status to be StatusWorking, got %q", node.Status)
+	}
+
+	// 2. Update status to READY_TO_PUSH
+	err = wm.UpdateNodeStatus(nodeName, types.StatusReadyToPush)
+	if err != nil {
+		t.Fatalf("UpdateNodeStatus(READY_TO_PUSH) failed: %v", err)
+	}
+
+	// Verify status updated in memory
+	node = wm.State.Nodes[nodeName]
+	if node.Status != types.StatusReadyToPush {
+		t.Errorf("Expected status to be StatusReadyToPush, got %q", node.Status)
+	}
+
+	// 3. Reload manager and verify persistence
+	wm2, err := NewManager(wm.RootPath)
+	if err != nil {
+		t.Fatalf("Failed to reload manager: %v", err)
+	}
+
+	loadedNode, exists := wm2.State.Nodes[nodeName]
+	if !exists {
+		t.Fatalf("Node not found after reload")
+	}
+
+	if loadedNode.Status != types.StatusReadyToPush {
+		t.Errorf("Expected persisted status to be StatusReadyToPush, got %q", loadedNode.Status)
+	}
+
+	// 4. Test status transitions
+	statusTransitions := []types.NodeStatus{
+		types.StatusFail,
+		types.StatusWorking,
+		types.StatusPushed,
+	}
+
+	for _, expectedStatus := range statusTransitions {
+		err = wm.UpdateNodeStatus(nodeName, expectedStatus)
+		if err != nil {
+			t.Fatalf("UpdateNodeStatus(%s) failed: %v", expectedStatus, err)
+		}
+
+		node = wm.State.Nodes[nodeName]
+		if node.Status != expectedStatus {
+			t.Errorf("Expected status to be %s, got %q", expectedStatus, node.Status)
+		}
+	}
+}
+
+func TestUpdateNodeStatusNonExistent(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
+	defer cleanup()
+
+	// Try to update status of non-existent node
+	err := wm.UpdateNodeStatus("non-existent-node", types.StatusReadyToPush)
+	if err == nil {
+		t.Errorf("UpdateNodeStatus succeeded for non-existent node, expected error")
+	}
+
+	// Verify error message contains node name
+	if err != nil && !strings.Contains(err.Error(), "non-existent-node") {
+		t.Errorf("Error message does not contain node name: %v", err)
+	}
+}
+
+func TestNodeStatusConstants(t *testing.T) {
+	// Verify all status constants are defined and have expected values
+	tests := []struct {
+		status   types.NodeStatus
+		expected string
+	}{
+		{types.StatusWorking, "WORKING"},
+		{types.StatusReadyToPush, "READY_TO_PUSH"},
+		{types.StatusFail, "FAIL"},
+		{types.StatusPushed, "PUSHED"},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.expected), func(t *testing.T) {
+			if string(tt.status) != tt.expected {
+				t.Errorf("Expected status value to be %q, got %q", tt.expected, tt.status)
+			}
+		})
+	}
+}
+
+func TestSpawnNodeSetsInitialStatus(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
+	defer cleanup()
+
+	nodeName := "test-initial-status"
+	logicalBranch := "feature/initial"
+
+	// Spawn node
+	err := wm.SpawnNode(nodeName, logicalBranch, "main", "Test", true)
+	if err != nil {
+		t.Fatalf("SpawnNode failed: %v", err)
+	}
+
+	// Verify initial status is StatusWorking
+	node := wm.State.Nodes[nodeName]
+	if node.Status != types.StatusWorking {
+		t.Errorf("Expected initial status to be StatusWorking, got %q", node.Status)
+	}
+
+	// Reload and verify persistence
+	wm2, err := NewManager(wm.RootPath)
+	if err != nil {
+		t.Fatalf("Failed to reload manager: %v", err)
+	}
+
+	loadedNode, exists := wm2.State.Nodes[nodeName]
+	if !exists {
+		t.Fatalf("Node not found after reload")
+	}
+
+	if loadedNode.Status != types.StatusWorking {
+		t.Errorf("Expected persisted initial status to be StatusWorking, got %q", loadedNode.Status)
+	}
+}

@@ -9,7 +9,6 @@ import (
 	"orion/internal/workspace"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 var initCmd = &cobra.Command{
@@ -60,47 +59,12 @@ Clones the repository into a 'repo' subdirectory and sets up configuration.`,
 			os.Exit(1)
 		}
 
-		// 4. Update Git Identity in config.yaml (V1 Feature)
-		userName, _ := git.GetConfig(wm.State.RepoPath, "user.name")
-		userEmail, _ := git.GetConfig(wm.State.RepoPath, "user.email")
-
-		if userName != "" || userEmail != "" {
-			fmt.Printf("Detected git identity: %s <%s>\n", userName, userEmail)
-
-			// Load existing config
-			config, err := wm.GetConfig()
-			if err != nil {
-				fmt.Printf("Warning: Failed to load config.yaml: %v\n", err)
-			} else {
-				// Update config
-				if userName != "" {
-					config.Git.User = userName
-				}
-				if userEmail != "" {
-					config.Git.Email = userEmail
-				}
-
-				// Save config back
-				configPath := filepath.Join(wm.RootPath, workspace.MetaDir, workspace.ConfigFile)
-				data, err := yaml.Marshal(config)
-				if err != nil {
-					fmt.Printf("Warning: Failed to marshal config.yaml: %v\n", err)
-				} else {
-					if err := os.WriteFile(configPath, data, 0644); err != nil {
-						fmt.Printf("Warning: Failed to save config.yaml: %v\n", err)
-					} else {
-						fmt.Println("✔ Updated config.yaml with git identity.")
-					}
-				}
-			}
-		}
-
-		// 6. Create initial VSCode workspace file
+		// 4. Create initial VSCode workspace file
 		if err := wm.SyncVSCodeWorkspace(); err != nil {
 			fmt.Printf("Warning: Failed to create VSCode workspace file: %v\n", err)
 		}
 
-		// 7. Install Git Hooks (V1 Feature)
+		// 5. Install Git Hooks (V1 Feature)
 		fmt.Println("Installing Git hooks...")
 		if err := git.InstallPrePushHook(wm.State.RepoPath); err != nil {
 			fmt.Printf("Warning: Failed to install pre-push hook: %v\n", err)

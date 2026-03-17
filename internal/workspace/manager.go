@@ -139,6 +139,8 @@ workspace: workspaces
 
 git:
   main_branch: main
+  user: orion
+  email: agent@orion.dev
 
 workflow:
   default: default
@@ -374,13 +376,18 @@ func (wm *WorkspaceManager) SpawnNode(nodeName, logicalBranch, baseBranch, label
 
 	wm.State.Nodes[nodeName] = newNode
 
-	// 5. Persist State
+	// 5. Apply Git Config from config.yaml
+	if err := wm.applyGitConfigToWorktree(worktreePath); err != nil {
+		fmt.Printf("Warning: Failed to apply git config: %v\n", err)
+	}
+
+	// 6. Persist State
 	if err := wm.SaveState(); err != nil {
 		// Rollback? ideally yes, but for MVP let's just warn
 		return fmt.Errorf("node created but state save failed: %w", err)
 	}
 
-	// 6. Update VSCode Workspace
+	// 7. Update VSCode Workspace
 	if err := wm.SyncVSCodeWorkspace(); err != nil {
 		fmt.Printf("Warning: Failed to update VSCode workspace file: %v\n", err)
 	}
@@ -403,7 +410,12 @@ func (wm *WorkspaceManager) CreateAgentNode(nodeName, shadowBranch, baseBranch, 
 		return nil, err
 	}
 
-	// 2. Create Tmux Session
+	// 2. Apply Git Config from config.yaml
+	if err := wm.applyGitConfigToWorktree(worktreePath); err != nil {
+		fmt.Printf("Warning: Failed to apply git config: %v\n", err)
+	}
+
+	// 3. Create Tmux Session
 	sessionName := fmt.Sprintf("orion-%s", nodeName)
 	if err := tmux.NewSession(sessionName, worktreePath); err != nil {
 		return nil, fmt.Errorf("failed to create tmux session: %w", err)
@@ -434,6 +446,28 @@ func (wm *WorkspaceManager) CreateAgentNode(nodeName, shadowBranch, baseBranch, 
 	// wm.SyncVSCodeWorkspace()
 
 	return &node, nil
+}
+
+// applyGitConfigToWorktree applies git user.name and user.email from config.yaml to the worktree.
+func (wm *WorkspaceManager) applyGitConfigToWorktree(worktreePath string) error {
+	config, err := wm.GetConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Only apply if values are set in config
+	if config.Git.User != "" {
+		if err := git.SetConfig(worktreePath, "user.name", config.Git.User); err != nil {
+			return fmt.Errorf("failed to set user.name: %w", err)
+		}
+	}
+	if config.Git.Email != "" {
+		if err := git.SetConfig(worktreePath, "user.email", config.Git.Email); err != nil {
+			return fmt.Errorf("failed to set user.email: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // EnterNode launches or attaches to a tmux session for the given node.

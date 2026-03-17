@@ -449,3 +449,107 @@ func TestAppliedRunsPersistence(t *testing.T) {
 		t.Errorf("AppliedRuns content mismatch: %v", loadedNode.AppliedRuns)
 	}
 }
+
+func TestUpdateNodeStatus(t *testing.T) {
+	wm, cleanup := setupTestWorkspace(t)
+	defer cleanup()
+
+	nodeName := "test-node-status"
+	logicalBranch := "feature/status-test"
+
+	// 1. Spawn Node - should have StatusWorking by default
+	err := wm.SpawnNode(nodeName, logicalBranch, "main", "Status test", true)
+	if err != nil {
+		t.Fatalf("SpawnNode failed: %v", err)
+	}
+
+	node := wm.State.Nodes[nodeName]
+	if node.Status != types.StatusWorking {
+		t.Errorf("Expected initial status to be WORKING, got %q", node.Status)
+	}
+
+	// 2. Update status to READY_TO_PUSH
+	err = wm.UpdateNodeStatus(nodeName, types.StatusReadyToPush)
+	if err != nil {
+		t.Fatalf("UpdateNodeStatus(READY_TO_PUSH) failed: %v", err)
+	}
+
+	// Verify in-memory state
+	node = wm.State.Nodes[nodeName]
+	if node.Status != types.StatusReadyToPush {
+		t.Errorf("Expected status to be READY_TO_PUSH, got %q", node.Status)
+	}
+
+	// 3. Reload manager and verify persistence
+	wm2, err := NewManager(wm.RootPath)
+	if err != nil {
+		t.Fatalf("Failed to reload manager: %v", err)
+	}
+
+	loadedNode, exists := wm2.State.Nodes[nodeName]
+	if !exists {
+		t.Fatalf("Node not found after reload")
+	}
+
+	if loadedNode.Status != types.StatusReadyToPush {
+		t.Errorf("Expected persisted status to be READY_TO_PUSH, got %q", loadedNode.Status)
+	}
+
+	// 4. Test updating to FAIL status (on wm2)
+	err = wm2.UpdateNodeStatus(nodeName, types.StatusFail)
+	if err != nil {
+		t.Fatalf("UpdateNodeStatus(FAIL) failed: %v", err)
+	}
+
+	// Verify in-memory state on wm2
+	loadedNode = wm2.State.Nodes[nodeName]
+	if loadedNode.Status != types.StatusFail {
+		t.Errorf("Expected status to be FAIL, got %q", loadedNode.Status)
+	}
+
+	// Reload again to verify persistence
+	wm3, err := NewManager(wm.RootPath)
+	if err != nil {
+		t.Fatalf("Failed to reload manager: %v", err)
+	}
+
+	loadedNode, exists = wm3.State.Nodes[nodeName]
+	if !exists {
+		t.Fatalf("Node not found after reload")
+	}
+	if loadedNode.Status != types.StatusFail {
+		t.Errorf("Expected persisted status to be FAIL, got %q", loadedNode.Status)
+	}
+
+	// 5. Test updating to PUSHED status (on wm3)
+	err = wm3.UpdateNodeStatus(nodeName, types.StatusPushed)
+	if err != nil {
+		t.Fatalf("UpdateNodeStatus(PUSHED) failed: %v", err)
+	}
+
+	// Verify in-memory state on wm3
+	loadedNode = wm3.State.Nodes[nodeName]
+	if loadedNode.Status != types.StatusPushed {
+		t.Errorf("Expected status to be PUSHED, got %q", loadedNode.Status)
+	}
+
+	// Final reload to verify persistence
+	wm4, err := NewManager(wm.RootPath)
+	if err != nil {
+		t.Fatalf("Failed to reload manager: %v", err)
+	}
+
+	loadedNode, exists = wm4.State.Nodes[nodeName]
+	if !exists {
+		t.Fatalf("Node not found after final reload")
+	}
+	if loadedNode.Status != types.StatusPushed {
+		t.Errorf("Expected persisted status to be PUSHED, got %q", loadedNode.Status)
+	}
+
+	// 6. Test updating non-existent node
+	err = wm.UpdateNodeStatus("non-existent-node", types.StatusWorking)
+	if err == nil {
+		t.Errorf("Expected error when updating non-existent node, got nil")
+	}
+}

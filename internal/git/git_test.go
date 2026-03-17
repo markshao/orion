@@ -4,6 +4,7 @@ import (
     "os"
     "os/exec"
     "path/filepath"
+    "strings"
     "testing"
 )
 
@@ -222,6 +223,57 @@ func TestGetCurrentBranch(t *testing.T) {
     }
     if br != "main" {
         t.Errorf("unexpected current branch: got %q, want %q", br, "main")
+    }
+}
+
+func TestPushBranch(t *testing.T) {
+    // Create a temp repo to act as "remote"
+    remoteDir, err := os.MkdirTemp("", "orion-remote-test")
+    if err != nil {
+        t.Fatalf("failed to create temp remote dir: %v", err)
+    }
+    defer os.RemoveAll(remoteDir)
+
+    // Initialize bare repo as remote
+    exec.Command("git", "init", "--bare", remoteDir).Run()
+
+    // Create a local repo with a commit
+    localDir, err := os.MkdirTemp("", "orion-local-test")
+    if err != nil {
+        t.Fatalf("failed to create temp local dir: %v", err)
+    }
+    defer os.RemoveAll(localDir)
+
+    exec.Command("git", "init", localDir).Run()
+    exec.Command("git", "-C", localDir, "config", "user.email", "test@example.com").Run()
+    exec.Command("git", "-C", localDir, "config", "user.name", "Test User").Run()
+    exec.Command("git", "-C", localDir, "checkout", "-b", "main").Run()
+
+    readme := filepath.Join(localDir, "README.md")
+    os.WriteFile(readme, []byte("# Test"), 0644)
+    exec.Command("git", "-C", localDir, "add", ".").Run()
+    exec.Command("git", "-C", localDir, "commit", "-m", "Initial commit").Run()
+
+    // Add remote
+    exec.Command("git", "-C", localDir, "remote", "add", "origin", remoteDir).Run()
+
+    // Test pushing main branch
+    if err := PushBranch(localDir, "main"); err != nil {
+        t.Errorf("PushBranch failed: %v", err)
+    }
+
+    // Verify branch exists in remote
+    out, err := exec.Command("git", "--git-dir", remoteDir, "branch").CombinedOutput()
+    if err != nil {
+        t.Fatalf("failed to list remote branches: %v", err)
+    }
+    if !strings.Contains(string(out), "main") {
+        t.Errorf("main branch not found in remote after push")
+    }
+
+    // Test pushing non-existent branch should fail
+    if err := PushBranch(localDir, "non-existent"); err == nil {
+        t.Errorf("PushBranch(non-existent) succeeded, expected error")
     }
 }
 

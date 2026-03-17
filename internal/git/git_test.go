@@ -225,3 +225,93 @@ func TestGetCurrentBranch(t *testing.T) {
     }
 }
 
+func TestPushBranch(t *testing.T) {
+    // Create a temp directory for the "remote" bare repo
+    remoteDir, err := os.MkdirTemp("", "orion-remote-test")
+    if err != nil {
+        t.Fatalf("failed to create temp remote dir: %v", err)
+    }
+    defer os.RemoveAll(remoteDir)
+
+    // Initialize bare repo as remote
+    cmd := exec.Command("git", "init", "--bare", remoteDir)
+    if output, err := cmd.CombinedOutput(); err != nil {
+        t.Fatalf("failed to init bare repo: %v, output: %s", err, output)
+    }
+
+    // Create local repo
+    localDir, err := os.MkdirTemp("", "orion-local-test")
+    if err != nil {
+        t.Fatalf("failed to create temp local dir: %v", err)
+    }
+    defer os.RemoveAll(localDir)
+
+    // Initialize local repo
+    exec.Command("git", "-C", localDir, "init").Run()
+    exec.Command("git", "-C", localDir, "config", "user.email", "test@example.com").Run()
+    exec.Command("git", "-C", localDir, "config", "user.name", "Test User").Run()
+    exec.Command("git", "-C", localDir, "checkout", "-b", "main").Run()
+
+    // Create initial commit
+    readme := filepath.Join(localDir, "README.md")
+    os.WriteFile(readme, []byte("# Test Repo"), 0644)
+    exec.Command("git", "-C", localDir, "add", ".").Run()
+    exec.Command("git", "-C", localDir, "commit", "-m", "Initial commit").Run()
+
+    // Add remote
+    exec.Command("git", "-C", localDir, "remote", "add", "origin", remoteDir).Run()
+
+    // Test 1: Push main branch
+    if err := PushBranch(localDir, "main"); err != nil {
+        t.Fatalf("PushBranch(main) failed: %v", err)
+    }
+
+    // Verify remote has the branch by cloning it
+    cloneDir, err := os.MkdirTemp("", "orion-clone-test")
+    if err != nil {
+        t.Fatalf("failed to create temp clone dir: %v", err)
+    }
+    defer os.RemoveAll(cloneDir)
+
+    cmd = exec.Command("git", "clone", remoteDir, cloneDir)
+    if err := cmd.Run(); err != nil {
+        t.Fatalf("failed to clone remote: %v", err)
+    }
+
+    // Check main branch exists in cloned repo
+    cmd = exec.Command("git", "rev-parse", "--verify", "main")
+    cmd.Dir = cloneDir
+    if err := cmd.Run(); err != nil {
+        t.Error("main branch not found in remote after push")
+    }
+
+    // Test 2: Push non-existent branch should fail
+    err = PushBranch(localDir, "non-existent-branch")
+    if err == nil {
+        t.Error("expected error when pushing non-existent branch, got nil")
+    }
+}
+
+func TestGetLatestCommitHash(t *testing.T) {
+    repoPath, cleanup := setupTestRepo(t)
+    defer cleanup()
+
+    hash, err := GetLatestCommitHash(repoPath)
+    if err != nil {
+        t.Fatalf("GetLatestCommitHash failed: %v", err)
+    }
+
+    // Verify hash is 40 characters (SHA-1)
+    if len(hash) != 40 {
+        t.Errorf("expected commit hash to be 40 characters, got %d", len(hash))
+    }
+
+    // Verify hash is hexadecimal
+    for _, c := range hash {
+        if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+            t.Errorf("invalid character in commit hash: %c", c)
+            break
+        }
+    }
+}
+

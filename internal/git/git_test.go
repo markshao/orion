@@ -528,3 +528,35 @@ func TestSquashMerge(t *testing.T) {
 		t.Errorf("commit message = %q, want %q", string(output), commitMsg)
 	}
 }
+
+// TestPushBranch 测试推送分支
+func TestPushBranch(t *testing.T) {
+	repoPath, remotePath, cleanup := setupTestRepoWithRemote(t)
+	defer cleanup()
+
+	// 在 repo 中创建新分支
+	newBranch := "feature/push-test"
+	exec.Command("git", "-C", repoPath, "checkout", "-b", newBranch).Run()
+
+	// 创建文件
+	testFile := filepath.Join(repoPath, "push_test.txt")
+	os.WriteFile(testFile, []byte("push test content"), 0644)
+
+	exec.Command("git", "-C", repoPath, "add", ".").Run()
+	exec.Command("git", "-C", repoPath, "commit", "-m", "Add push test file").Run()
+
+	// 推送分支
+	err := PushBranch(repoPath, newBranch)
+	if err != nil {
+		t.Fatalf("PushBranch failed: %v", err)
+	}
+
+	// 验证远程分支存在
+	output, err := exec.Command("git", "-C", remotePath, "branch", "-a").CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to list remote branches: %v", err)
+	}
+	if !strings.Contains(string(output), newBranch) {
+		t.Errorf("remote should have branch %s, got: %s", newBranch, string(output))
+	}
+}

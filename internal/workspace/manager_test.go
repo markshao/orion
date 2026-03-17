@@ -398,16 +398,6 @@ func TestRemoveNode(t *testing.T) {
 	if exists {
 		t.Error("node should not exist after removal")
 	}
-
-	// 验证 worktree 已删除
-	node, _ := wm.State.Nodes[nodeName]
-	if node.WorktreePath != "" {
-		// 注意：RemoveNode 会删除 worktree，但 node 变量是旧的
-		// 我们需要重新获取或检查路径
-		if _, err := os.Stat(node.WorktreePath); !os.IsNotExist(err) {
-			t.Errorf("worktree should be removed")
-		}
-	}
 }
 
 // TestFindNodeByPath 测试通过路径查找节点

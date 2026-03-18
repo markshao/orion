@@ -10,6 +10,7 @@ import (
 
 	"orion/internal/workspace"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -154,6 +155,13 @@ Examples:
 			fmt.Printf("Error: Execution directory does not exist: %s\n", execDir)
 			os.Exit(1)
 		}
+
+		// Print the context
+		contextName := "main_repo"
+		if worktreeName != "" {
+			contextName = worktreeName
+		}
+		color.Cyan("➤ Executing command under %s/", contextName)
 
 		// 执行命令
 		command := exec.Command(commandArgs[0], commandArgs[1:]...)

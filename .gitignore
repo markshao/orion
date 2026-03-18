@@ -40,6 +40,9 @@ playground/*
 bin/
 dist/
 
+# Binary
+orion
+
 # Test directories
 *_demo/
 *_swarm/

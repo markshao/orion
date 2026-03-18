@@ -287,6 +287,12 @@ Context:
 	// Inject Artifact Dir
 	resolvedEnv = append(resolvedEnv, fmt.Sprintf("ORION_ARTIFACT_DIR=%s", absArtifactDir))
 
+	// Setup log file for this step
+	stepArtifactDir := filepath.Join(e.wm.RootPath, workspace.MetaDir, workspace.RunsDir, run.ID, "artifacts", stepDef.ID)
+	_ = os.MkdirAll(stepArtifactDir, 0755)
+	logFile := filepath.Join(stepArtifactDir, "agent.log")
+	step.LogPath = logFile
+
 	// 8. Execute Agent
 	// Check if provider has a custom command template in config.yaml
 	config, err = e.wm.GetConfig()
@@ -343,11 +349,12 @@ Context:
 set -x
 # Inject Authentication Context
 %s
-%s
+# Execute command and tee output to log
+%s 2>&1 | tee %q
 EXIT_CODE=$?
 echo $EXIT_CODE > .agent_exit_code
 exit $EXIT_CODE
-`, authEnvInjection, cmdStr)
+`, authEnvInjection, cmdStr, logFile)
 
 		scriptPath := filepath.Join(node.WorktreePath, "run_agent.sh")
 		if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
@@ -412,7 +419,8 @@ exit $EXIT_CODE
 		if err != nil {
 			return fmt.Errorf("agent execution failed: %w", err)
 		}
-		_ = output
+		// Write output to log file
+		_ = os.WriteFile(logFile, []byte(output), 0644)
 	}
 
 	// 8. Commit Changes

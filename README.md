@@ -81,12 +81,51 @@ orion init https://github.com/user/repo.git
 
 #### 2. Start Coding (Human Node)
 
+**Option A: Manual Creation**
+
 ```bash
 # Create a node for your feature
 orion spawn feature/login login-dev
 
 # Enter the isolated environment
 orion enter login-dev
+```
+
+**Option B: AI-Powered Creation (Recommended)**
+
+Use natural language to let AI generate branch and node names for you:
+
+```bash
+# Create a node using natural language
+orion ai "implement user login feature"
+
+# Based on a specific branch
+orion ai "fix payment bug based on release/v1.2"
+
+# Skip confirmation with --force flag
+orion ai "refactor authentication module" --force
+```
+
+The `orion ai` command will:
+- Analyze your description using LLM (Moonshot/OpenAI-compatible)
+- Auto-generate appropriate branch name (e.g., `feature/user-login`, `fix/payment-bug`)
+- Auto-generate readable node name (e.g., `user-login-dev`, `payment-fix`)
+- Create the worktree and set up the development environment
+
+**Configuration**
+
+Create `~/.orion.conf` to configure your AI provider:
+
+```yaml
+api_key: "$MOONSHOT_API_KEY"          # Or direct key: "sk-xxx"
+base_url: "https://api.moonshot.cn/v1"
+model: "kimi-k2-turbo-preview"
+```
+
+Then enter your development environment:
+
+```bash
+orion enter <generated-node-name>
 ```
 
 #### 3. Agent Collaboration

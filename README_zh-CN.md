@@ -73,12 +73,52 @@ orion init https://github.com/user/repo.git
 ```
 
 #### 2. 开始编码 (Human Node)
+
+**方式 A: 手动创建**
+
 ```bash
 # 为你的特性创建一个节点
 orion spawn feature/login login-dev
 
 # 进入隔离环境
 orion enter login-dev
+```
+
+**方式 B: AI 智能创建 (推荐)**
+
+使用自然语言让 AI 自动生成分支名和节点名：
+
+```bash
+# 使用自然语言创建节点
+orion ai "实现用户登录功能"
+
+# 基于特定分支开发
+orion ai "基于 release/v1.2 修复支付 bug"
+
+# 使用 --force 跳过确认
+orion ai "重构认证模块" --force
+```
+
+`orion ai` 命令会：
+- 使用 LLM (Moonshot/OpenAI 兼容) 分析你的描述
+- 自动生成合适的分支名（如 `feature/user-login`、`fix/payment-bug`）
+- 自动生成易读的节点名（如 `user-login-dev`、`payment-fix`）
+- 创建 worktree 并搭建开发环境
+
+**配置**
+
+创建 `~/.orion.conf` 配置你的 AI 提供商：
+
+```yaml
+api_key: "$MOONSHOT_API_KEY"          # 或直接填写: "sk-xxx"
+base_url: "https://api.moonshot.cn/v1"
+model: "kimi-k2-turbo-preview"
+```
+
+然后进入开发环境：
+
+```bash
+orion enter <生成的节点名>
 ```
 
 #### 3. Agent 协作

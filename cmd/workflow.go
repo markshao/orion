@@ -24,7 +24,7 @@ var workflowCmd = &cobra.Command{
 }
 
 var runWorkflowCmd = &cobra.Command{
-	Use:   "run [workflow_name] [node_name]",
+	Use:   "run [workflow_name]",
 	Short: "Trigger a workflow run on a specific node",
 	Long: `Trigger a workflow run on a specific node.
 
@@ -35,11 +35,12 @@ After completion, the target node's status will be updated based on the result:
 
 Examples:
   # Run default workflow on my-feature node
-  orion workflow run default my-feature
+  orion workflow run default --node my-feature
 
   # Run custom workflow on a node
-  orion workflow run code-review login-node`,
-	Args: cobra.RangeArgs(0, 2),
+  orion workflow run code-review --node login-node`,
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: CompleteWorkflowNames,
 	Run: func(cmd *cobra.Command, args []string) {
 		wfName := "default"
 		if len(args) > 0 {
@@ -67,7 +68,7 @@ Examples:
 			os.Exit(1)
 		}
 
-		// Determine target node (priority: --node flag > args[1] > auto-detect)
+		// Determine target node (priority: --node flag > auto-detect)
 		var targetNodeName string
 		var targetNode *types.Node
 
@@ -82,16 +83,6 @@ Examples:
 			}
 			targetNode = &node
 			fmt.Printf("Target node (from --node flag): %s\n", targetNodeName)
-		} else if len(args) >= 2 {
-			// Explicitly specified node name as positional arg
-			targetNodeName = args[1]
-			node, exists := wm.State.Nodes[targetNodeName]
-			if !exists {
-				color.Red("Node '%s' does not exist", targetNodeName)
-				os.Exit(1)
-			}
-			targetNode = &node
-			fmt.Printf("Target node: %s\n", targetNodeName)
 		} else {
 			// Auto-detect from current directory
 			detectedName, detectedNode, err := wm.FindNodeByPath(cwd)
@@ -522,6 +513,33 @@ Examples:
   orion workflow rm run-1 run-2 run-3
   orion workflow ls | grep completed | awk '{print $1}' | xargs orion workflow rm -f`,
 	Args: cobra.MinimumNArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		rootPath, err := workspace.FindWorkspaceRoot(cwd)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		wm, err := workspace.NewManager(rootPath)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		engine := workflow.NewEngine(wm)
+		runs, err := engine.ListRuns()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		var completions []string
+		for _, run := range runs {
+			desc := fmt.Sprintf("%s - %s (%s)", run.Workflow, run.Status, run.StartTime.Format("01-02 15:04"))
+			completions = append(completions, fmt.Sprintf("%s\t%s", run.ID, desc))
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		force, _ := cmd.Flags().GetBool("force")
 
@@ -625,6 +643,9 @@ Examples:
 func init() {
 	runWorkflowCmd.Flags().StringP("trigger", "t", "manual", "Trigger type (e.g. manual)")
 	runWorkflowCmd.Flags().StringP("node", "n", "", "Target node name (auto-detected if not specified)")
+	// Register completion function for --node flag
+	_ = runWorkflowCmd.RegisterFlagCompletionFunc("node", CompleteNodeNamesForFlag)
+
 	rmWorkflowCmd.Flags().BoolP("force", "f", false, "Force remove run and all its agentic nodes")
 	lsWorkflowCmd.Flags().BoolP("quiet", "q", false, "Only output run IDs (for piping)")
 	logsWorkflowCmd.Flags().BoolP("follow", "f", false, "Follow log output (tail -f style)")
@@ -651,7 +672,39 @@ var artifactsCmd = &cobra.Command{
 var lsArtifactsCmd = &cobra.Command{
 	Use:   "ls [run_id]",
 	Short: "List artifacts for a workflow run",
-	Args:  cobra.MaximumNArgs(1),
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// Only autocomplete the first argument (run_id)
+		if len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		rootPath, err := workspace.FindWorkspaceRoot(cwd)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		wm, err := workspace.NewManager(rootPath)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		engine := workflow.NewEngine(wm)
+		runs, err := engine.ListRuns()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		var completions []string
+		for _, run := range runs {
+			desc := fmt.Sprintf("%s - %s (%s)", run.Workflow, run.Status, run.StartTime.Format("01-02 15:04"))
+			completions = append(completions, fmt.Sprintf("%s\t%s", run.ID, desc))
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cwd, err := os.Getwd()
 		if err != nil {

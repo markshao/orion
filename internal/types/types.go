@@ -91,7 +91,7 @@ type PipelineStep struct {
 	DependsOn []string `yaml:"depends_on,omitempty"`
 
 	// Agent Step fields (type = "agent" or empty)
-	Agent      string `yaml:"agent"`       // Agent configuration name (e.g., "ut-agent")
+	Agent      string `yaml:"agent"`       // Agent configuration name (e.g., "dev-agent")
 	BaseBranch string `yaml:"base-branch"` // Base branch for shadow branch creation, required for agent steps
 
 	// Bash Step fields (type = "bash")
@@ -116,7 +116,7 @@ func (s PipelineStep) IsBash() bool {
 	return s.Type == StepTypeBash
 }
 
-// Agent represents an agent definition (e.g. agents/ut-agent.yaml)
+// Agent represents an agent definition (e.g. agents/dev-agent.yaml)
 type Agent struct {
 	Name    string       `yaml:"name"`
 	Runtime AgentRuntime `yaml:"runtime"`

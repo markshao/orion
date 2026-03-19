@@ -142,9 +142,6 @@ git:
   user: orion
   email: agent@orion.dev
 
-workflow:
-  default: default
-
 runtime:
   artifact_dir: .orion/runs
 
@@ -160,90 +157,7 @@ agents:
 		return err
 	}
 
-	// 2. workflows/default.yaml
-	workflowContent := `name: default
-
-trigger:
-  event: commit
-
-pipeline:
-  - id: ut
-    agent: ut-agent
-    branch: shadow
-    suffix: ut
-
-  - id: cr
-    agent: cr-agent
-    depends_on: [ut]
-    branch: shadow
-    suffix: cr
-`
-	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, WorkflowsDir, "default.yaml"), []byte(workflowContent), 0644); err != nil {
-		return err
-	}
-
-	// 3. agents/ut-agent.yaml
-	utAgentContent := `name: ut-agent
-base_template: default
-
-runtime:
-  provider: qwen
-  model: qwen-max
-
-prompt: ut.md
-`
-	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, AgentsDir, "ut-agent.yaml"), []byte(utAgentContent), 0644); err != nil {
-		return err
-	}
-
-	// 4. agents/cr-agent.yaml
-	crAgentContent := `name: cr-agent
-base_template: default
-
-runtime:
-  provider: qwen
-  model: qwen-max
-
-prompt: cr.md
-`
-	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, AgentsDir, "cr-agent.yaml"), []byte(crAgentContent), 0644); err != nil {
-		return err
-	}
-
-	// 5. prompts/ut.md
-	utPromptContent := `# Unit Test Generation
-
-Your task is to analyze the code changes provided below and **immediately generate and write unit tests** for them.
-
-**DO NOT OUTPUT CODE BLOCKS IN THE CHAT.**
-Write the tests directly into the repository files.
-
-Requirements:
-- Create or update *_test.go files as needed.
-- Ensure tests compile and pass.
-- Cover edge cases and expected behavior.
-
-If you need to write any non-code outputs (reports, summaries), write them to:
-{{.ArtifactDir}}
-`
-	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, PromptsDir, "ut.md"), []byte(utPromptContent), 0644); err != nil {
-		return err
-	}
-
-	// 6. prompts/cr.md
-	crPromptContent := `# Code Review
-
-Review the code changes and provide constructive feedback.
-Focus on correctness, performance, security, and readability.
-
-Write the review report to:
-{{.ArtifactDir}}/review_report.md
-`
-	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, PromptsDir, "cr.md"), []byte(crPromptContent), 0644); err != nil {
-		return err
-	}
-
-	// 7. prompts/base.md
+	// 2. prompts/base.md
 	basePromptContent := `You are an intelligent agent working in the Orion environment.
 
 # Context

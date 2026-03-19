@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 )
 
@@ -83,21 +82,6 @@ func TestInit(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, ConfigFile)); os.IsNotExist(err) {
 		t.Errorf("config.yaml not created")
 	}
-	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, WorkflowsDir, "default.yaml")); os.IsNotExist(err) {
-		t.Errorf("default workflow not created")
-	}
-	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, AgentsDir, "ut-agent.yaml")); os.IsNotExist(err) {
-		t.Errorf("ut-agent.yaml not created")
-	}
-	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, AgentsDir, "cr-agent.yaml")); os.IsNotExist(err) {
-		t.Errorf("cr-agent.yaml not created")
-	}
-	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, PromptsDir, "ut.md")); os.IsNotExist(err) {
-		t.Errorf("ut.md prompt not created")
-	}
-	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, PromptsDir, "cr.md")); os.IsNotExist(err) {
-		t.Errorf("cr.md prompt not created")
-	}
 
 	// Verify GetConfig parses config.yaml correctly
 	config, err := wm.GetConfig()
@@ -110,51 +94,10 @@ func TestInit(t *testing.T) {
 	if config.Workspace != "workspaces" {
 		t.Errorf("config.Workspace = %q, want %q", config.Workspace, "workspaces")
 	}
-	if def, ok := config.Workflow["default"]; !ok || def != "default" {
-		t.Errorf("config.Workflow[\"default\"] = %q, want %q", def, "default")
-	}
 
 	// Verify state file
 	if _, err := os.Stat(filepath.Join(wm.RootPath, MetaDir, StateFile)); os.IsNotExist(err) {
 		t.Errorf("state.json not created")
-	}
-}
-
-// TestInitGeneratesV1Configs verifies that Init (which calls generateV1Configs)
-// produces V1 configuration files that are aligned with the current defaults,
-// including the updated agent runtime and unit-test prompt content.
-func TestInitGeneratesV1Configs(t *testing.T) {
-	wm, cleanup := setupTestWorkspace(t)
-	defer cleanup()
-
-	// 1. ut-agent.yaml should use qwen as the code agent runtime
-	utAgentPath := filepath.Join(wm.RootPath, MetaDir, AgentsDir, "ut-agent.yaml")
-	data, err := os.ReadFile(utAgentPath)
-	if err != nil {
-		t.Fatalf("failed to read ut-agent.yaml: %v", err)
-	}
-	content := string(data)
-	if !strings.Contains(content, "provider: qwen") {
-		t.Errorf("ut-agent.yaml does not configure qwen provider; content: %s", content)
-	}
-
-	// 2. prompts/ut.md should contain the updated unit test generation instructions
-	utPromptPath := filepath.Join(wm.RootPath, MetaDir, PromptsDir, "ut.md")
-	data, err = os.ReadFile(utPromptPath)
-	if err != nil {
-		t.Fatalf("failed to read ut.md: %v", err)
-	}
-	prompt := string(data)
-
-	requiredSubstrings := []string{
-		"Your task is to analyze the code changes provided below and **immediately generate and write unit tests** for them.",
-		"**DO NOT OUTPUT CODE BLOCKS IN THE CHAT.**",
-	}
-
-	for _, sub := range requiredSubstrings {
-		if !strings.Contains(prompt, sub) {
-			t.Errorf("ut.md missing required text %q. Full prompt: %s", sub, prompt)
-		}
 	}
 }
 

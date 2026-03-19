@@ -41,11 +41,6 @@ func TestPreInstallReleaseWorkflow(t *testing.T) {
 		t.Errorf("release-workflow.yaml was not created")
 	}
 
-	// Verify default.yaml exists
-	if _, err := os.Stat(filepath.Join(orionDir, "workflows", "default.yaml")); os.IsNotExist(err) {
-		t.Errorf("default.yaml was not created")
-	}
-
 	// Verify rebase-agent.yaml exists and contains the correct provider
 	rebaseAgentPath := filepath.Join(orionDir, "agents", "rebase-agent.yaml")
 	data, err := os.ReadFile(rebaseAgentPath)

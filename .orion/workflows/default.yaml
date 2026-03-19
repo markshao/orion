@@ -4,13 +4,7 @@ trigger:
   event: commit
 
 pipeline:
-  - id: ut
+  - id: dev
     type: agent
-    agent: ut-agent
+    agent: dev-agent
     base-branch: ${input.node.branch}
-
-  - id: cr
-    type: agent
-    agent: cr-agent
-    depends_on: [ut]
-    base-branch: ${steps.ut.node.branch}

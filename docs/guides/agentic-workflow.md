@@ -25,11 +25,11 @@ Orion treats every agent task as a Git branch operation.
 
 Workflows are defined in `.orion/workflows/*.yaml`. They describe the *pipeline* of tasks.
 
-**Example: Unit Test -> Code Review Pipeline**
-Create `.orion/workflows/ut-cr.yaml`:
+**Example: Development Pipeline**
+Create `.orion/workflows/dev.yaml`:
 
 ```yaml
-name: ut-cr-workflow
+name: dev-workflow
 
 # Trigger Configuration
 trigger:
@@ -37,16 +37,10 @@ trigger:
   # branch: feature/* # Optional: Only trigger on specific branches
 
 pipeline:
-  # Step 1: Unit Test Generation
-  - id: ut-gen           # Unique ID for this step
-    agent: ut-agent      # Refers to .orion/agents/ut-agent.yaml
-    suffix: ut           # Shadow branch suffix: orion/<run-id>/ut
-
-  # Step 2: Code Review
-  - id: code-review
-    agent: cr-agent      # Refers to .orion/agents/cr-agent.yaml
-    depends_on: [ut-gen] # CR starts from the result of 'ut-gen'
-    suffix: cr           # Shadow branch suffix: orion/<run-id>/cr
+  # Step 1: Development
+  - id: dev              # Unique ID for this step
+    agent: dev-agent     # Refers to .orion/agents/dev-agent.yaml
+    suffix: dev          # Shadow branch suffix: orion/<run-id>/dev
 ```
 
 ### Dependency Logic
@@ -59,11 +53,11 @@ pipeline:
 
 Agents are the "workers". They are defined in `.orion/agents/*.yaml`.
 
-**Example: A Unit Test Agent**
-Create `.orion/agents/ut-agent.yaml`:
+**Example: A Development Agent**
+Create `.orion/agents/dev-agent.yaml`:
 
 ```yaml
-name: ut-agent
+name: dev-agent
 
 runtime:
   # The AI Provider to use (configured in .orion/config.yaml)
@@ -76,7 +70,7 @@ runtime:
   #   temperature: 0.7
 
 # The instruction file for the agent
-prompt: ut-gen.md
+prompt: dev-task.md
 ```
 
 ### Runtime Providers

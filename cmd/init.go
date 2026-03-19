@@ -171,29 +171,7 @@ pipeline:
 		return err
 	}
 
-	// 2. Write default.yaml
-	defaultWorkflowContent := `name: default
-
-trigger:
-  event: commit
-
-pipeline:
-  - id: ut
-    type: agent
-    agent: ut-agent
-    base-branch: ${input.node.branch}
-
-  - id: cr
-    type: agent
-    agent: cr-agent
-    depends_on: [ut]
-    base-branch: ${steps.ut.node.branch}
-`
-	if err := os.WriteFile(filepath.Join(orionDir, "workflows", "default.yaml"), []byte(defaultWorkflowContent), 0644); err != nil {
-		return err
-	}
-
-	// 3. Write rebase-agent.yaml
+	// 2. Write rebase-agent.yaml
 	rebaseAgentContent := fmt.Sprintf(`name: rebase-agent
 
 runtime:
@@ -205,7 +183,7 @@ prompt: rebase.md
 		return err
 	}
 
-	// 4. Write rebase.md
+	// 3. Write rebase.md
 	rebasePromptContent := `# Rebase and Conflict Resolution Task
 
 Your task is to rebase the current branch onto main (or origin/main) and resolve any conflicts that arise.

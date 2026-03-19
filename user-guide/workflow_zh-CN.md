@@ -6,31 +6,34 @@ Orion 开启了 **Agentic DevOps** 模式，AI Agents 与你并肩工作。Agent
 
 ## 1. 工作原理
 
-1.  **触发**: 你在 Human Node 中提交代码 (Commit)。
-2.  **工作流启动**: 自动触发定义在 `default.yaml` 中的工作流。
+1.  **触发**: 你通过 CLI 手动触发（或通过特定事件触发）工作流。
+2.  **工作流启动**: 自动执行定义的工作流（如 `release-workflow.yaml`）。
 3.  **影子分支链**:
-    -   **步骤 1 (UT Agent)**: 基于你的 Commit 创建影子分支，运行单元测试，修复 Bug 并提交。
-    -   **步骤 2 (Review Agent)**: 基于步骤 1 的结果创建新的影子分支，审查代码，添加注释或重构。
-4.  **应用 (Apply)**: 你审查最终结果，并将其合并回你的 Human Node。
+    -   **步骤 1 (Agent)**: 创建影子分支，执行任务，例如变基 (Rebase)、解决冲突并提交。
+4.  **应用 (Apply/Merge)**: 你或工作流本身将最终结果合并回你的 Human Node。
 
 ## 2. 配置
 
-工作流定义在 `.orion/workflows/default.yaml` 中。
+工作流定义在 `.orion/workflows/*.yaml` 中。例如 `release-workflow.yaml`：
 
 ```yaml
-name: default
+name: release-workflow
+
 trigger:
-  event: commit # 每次提交触发
+  event: manual # 通过 CLI 手动触发
 
 pipeline:
-  - id: ut
-    agent: ut-agent # 引用 .orion/agents/ut-agent.yaml
-    suffix: ut
-
-  - id: cr
-    agent: cr-agent
-    depends_on: [ut] # 在 UT agent 完成后运行
-    suffix: cr
+  - id: rebase
+    type: agent
+    agent: rebase-agent # 引用 .orion/agents/rebase-agent.yaml
+    base-branch: ${input.node.branch}
+    
+  - id: commit-check
+    type: bash
+    node: ${steps.rebase.node}
+    run: |
+      # 检查并确保提交存在
+    depends_on: [rebase]
 ```
 
 ## 3. 管理工作流

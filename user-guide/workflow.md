@@ -6,31 +6,34 @@ Orion enables **Agentic DevOps**, where AI agents work alongside you. Instead of
 
 ## 1. How it Works
 
-1.  **Trigger**: You commit code in your Human Node.
-2.  **Workflow Start**: A workflow (defined in `default.yaml`) is triggered automatically.
+1.  **Trigger**: You trigger a workflow manually via CLI (or upon certain events).
+2.  **Workflow Start**: The workflow (e.g., `release-workflow.yaml`) is executed.
 3.  **Shadow Branch Chain**:
-    -   **Step 1 (UT Agent)**: Creates a shadow branch off your commit, runs unit tests, fixes bugs, and commits changes.
-    -   **Step 2 (Review Agent)**: Creates a new shadow branch off Step 1's result, reviews code, adds comments or refactors.
-4.  **Apply**: You review the final result and merge it back to your Human Node.
+    -   **Step 1 (Agent)**: Creates a shadow branch, performs tasks like rebasing, resolving conflicts, and creating commits.
+4.  **Apply/Merge**: You or the workflow itself merges the final result back to your Human Node.
 
 ## 2. Configuration
 
-Workflows are defined in `.orion/workflows/default.yaml`.
+Workflows are defined in `.orion/workflows/*.yaml`. For example, `release-workflow.yaml`:
 
 ```yaml
-name: default
+name: release-workflow
+
 trigger:
-  event: commit # Trigger on every commit
+  event: manual # Triggered manually via CLI
 
 pipeline:
-  - id: ut
-    agent: ut-agent # Refers to .orion/agents/ut-agent.yaml
-    suffix: ut
-
-  - id: cr
-    agent: cr-agent
-    depends_on: [ut] # Runs after UT agent finishes
-    suffix: cr
+  - id: rebase
+    type: agent
+    agent: rebase-agent # Refers to .orion/agents/rebase-agent.yaml
+    base-branch: ${input.node.branch}
+    
+  - id: commit-check
+    type: bash
+    node: ${steps.rebase.node}
+    run: |
+      # Check and ensure commits
+    depends_on: [rebase]
 ```
 
 ## 3. Managing Workflows

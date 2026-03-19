@@ -19,7 +19,8 @@ var autoAttachCmd = &cobra.Command{
 	Long: `Intended for IDE integration (e.g. VS Code).
 Checks if the given file path (or current directory) belongs to a Orion node.
 If yes, attaches to that node's tmux session.
-If no, attaches to a default tmux session named 'default'.`,
+If path is inside workspace but not in any node, attaches to 'orion-root' session at workspace root.
+If not inside any Orion workspace, attaches to a default tmux session named 'default'.`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		targetPath := ""
@@ -83,9 +84,10 @@ If no, attaches to a default tmux session named 'default'.`,
 		// 3. Find Node by Path
 		nodeName, _, err := wm.FindNodeByPath(absPath)
 		if err != nil || nodeName == "" {
-			// Path is inside workspace root but not inside a specific node (e.g. repo dir) -> Fallback
-			log.Info("auto-attach: Path %s is inside workspace but not in any node", absPath)
-			fallbackToDefaultSession()
+			// Path is inside workspace root but not inside a specific node (e.g. repo dir)
+			// Enter the root session for workspace management
+			log.Info("auto-attach: Path %s is inside workspace but not in any node, entering root session", absPath)
+			enterRootSession(wsRoot)
 			return
 		}
 
@@ -98,6 +100,18 @@ If no, attaches to a default tmux session named 'default'.`,
 			return
 		}
 	},
+}
+
+func enterRootSession(wsRoot string) {
+	sessionName := "orion-root"
+	fmt.Printf("Attaching to Orion root session '%s' (workspace: %s)...\n", sessionName, wsRoot)
+	log.Info("auto-attach: Entering root session at %s", wsRoot)
+	if err := tmux.EnsureAndAttach(sessionName, wsRoot); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to attach to root session: %v\n", err)
+		log.Error("auto-attach: Failed to attach to root session: %v", err)
+		// Fallback to default if root session fails
+		fallbackToDefaultSession()
+	}
 }
 
 func fallbackToDefaultSession() {

@@ -65,6 +65,16 @@ func determineExecDir(wm *workspace.WorkspaceManager, cwd string, targetWorktree
 	return wm.State.RepoPath, "", nil
 }
 
+// shellQuote quotes a string for use as a shell argument.
+// It wraps the string in single quotes and escapes any existing single quotes.
+// Example: abc -> 'abc', ab'c -> 'ab'\''c'
+func shellQuote(s string) string {
+	if s == "" {
+		return "''"
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
 // runCmd represents the run command
 var runCmd = &cobra.Command{
 	Use:   "run <command> [args...]",
@@ -161,13 +171,31 @@ Examples:
 		if worktreeName != "" {
 			contextName = worktreeName
 		}
-		
 		// Print the context and flush to ensure our print appears before the command output
 		color.New(color.FgCyan).Fprintf(os.Stdout, "➤ Executing command under %s/\n", contextName)
 		os.Stdout.Sync()
 
-		// 执行命令
-		command := exec.Command(commandArgs[0], commandArgs[1:]...)
+		// Execute the command using /bin/bash -c
+		// We use bash to allow execution of shell built-ins and complex command strings if provided
+		var command *exec.Cmd
+
+		if len(commandArgs) == 1 {
+			// If a single argument is provided, assume it might be a full command string
+			// e.g. "git branch | grep foo"
+			// In this case, we pass it directly to bash -c
+			command = exec.Command("/bin/bash", "-c", commandArgs[0])
+		} else {
+			// If multiple arguments are provided, we assume they are [cmd, arg1, arg2, ...]
+			// We need to quote them safely to reconstruct the command line for bash
+			// e.g. [awk, {print $1}] -> bash -c "'awk' '{print $1}'"
+			var quotedArgs []string
+			for _, arg := range commandArgs {
+				quotedArgs = append(quotedArgs, shellQuote(arg))
+			}
+			commandLine := strings.Join(quotedArgs, " ")
+			command = exec.Command("/bin/bash", "-c", commandLine)
+		}
+
 		command.Dir = execDir
 		command.Stdin = os.Stdin
 		command.Stdout = os.Stdout

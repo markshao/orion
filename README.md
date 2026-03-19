@@ -75,7 +75,6 @@ See [Installation Guide](user-guide/installation.md) for building from source.
 #### 1. Initialize
 
 ```bash
-mkdir myproject_swarm && cd myproject_swarm
 orion init https://github.com/user/repo.git
 ```
 

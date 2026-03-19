@@ -152,6 +152,8 @@ agents:
       command: 'traecli "{{.Prompt}}" -py'
     qwen:
       command: 'qwen "{{.Prompt}}" -y'
+    kimi:
+      command: 'kimi -y -p "{{.Prompt}}"'
 `
 	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, ConfigFile), []byte(configContent), 0644); err != nil {
 		return err

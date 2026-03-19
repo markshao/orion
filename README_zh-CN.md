@@ -68,7 +68,6 @@ curl -fsSL https://raw.githubusercontent.com/markshao/orion/main/install.sh | ba
 
 #### 1. 初始化
 ```bash
-mkdir myproject_swarm && cd myproject_swarm
 orion init https://github.com/user/repo.git
 ```
 

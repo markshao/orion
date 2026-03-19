@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 )
 
 // QwenProvider implements the Provider interface for Qwen.
@@ -49,11 +50,43 @@ func (p *QwenProvider) Run(ctx context.Context, prompt string, workdir string, e
 	return "Agent execution completed successfully (simulated).", nil
 }
 
+// KimiProvider implements the Provider interface for Kimi CLI.
+// Uses the 'kimi' command line tool with -y (yolo) and -p (prompt) flags.
+type KimiProvider struct {
+	Config Config
+}
+
+func NewKimiProvider(cfg Config) *KimiProvider {
+	return &KimiProvider{Config: cfg}
+}
+
+func (p *KimiProvider) Name() string {
+	return "kimi"
+}
+
+func (p *KimiProvider) Run(ctx context.Context, prompt string, workdir string, env []string) (string, error) {
+	fmt.Printf("[Kimi] Executing in %s\n", workdir)
+
+	// Execute kimi with -y (yolo/auto-approve) and -p (prompt) flags
+	cmd := exec.CommandContext(ctx, "kimi", "-y", "-p", prompt)
+	cmd.Dir = workdir
+	cmd.Env = append(os.Environ(), env...)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), fmt.Errorf("kimi execution failed: %w", err)
+	}
+
+	return string(output), nil
+}
+
 // Factory to create providers
 func NewProvider(cfg Config) (Provider, error) {
 	switch cfg.Provider {
 	case "qwen":
 		return NewQwenProvider(cfg), nil
+	case "kimi":
+		return NewKimiProvider(cfg), nil
 	case "trae":
 		// return NewTraeProvider(cfg), nil
 		return nil, fmt.Errorf("trae provider not yet implemented")

@@ -55,16 +55,6 @@ func (e *Engine) StartRun(workflowName, trigger, baseBranch, triggeredByNode str
 		}
 	}
 
-	// Capture trigger data if triggered by push
-	triggerData := ""
-	if trigger == "push" {
-		// Get current branch and latest commit info
-		hash, err := git.GetLatestCommitHash(e.wm.State.RepoPath)
-		if err == nil && len(hash) >= 7 {
-			triggerData = hash[:7] // Short hash
-		}
-	}
-
 	// 3. Create Run structure
 	runID := fmt.Sprintf("run-%s-%s", time.Now().Format("20060102"), uuid.New().String()[:8])
 	runDir := filepath.Join(e.wm.RootPath, workspace.MetaDir, workspace.RunsDir, runID)
@@ -76,7 +66,6 @@ func (e *Engine) StartRun(workflowName, trigger, baseBranch, triggeredByNode str
 		ID:              runID,
 		Workflow:        workflowName,
 		Trigger:         trigger,
-		TriggerData:     triggerData,
 		BaseBranch:      baseBranch,
 		TriggeredByNode: triggeredByNode,
 		Status:          StatusRunning, // Mark as running immediately
@@ -85,9 +74,14 @@ func (e *Engine) StartRun(workflowName, trigger, baseBranch, triggeredByNode str
 	}
 
 	for i, step := range wf.Pipeline {
+		stepType := "agent"
+		if step.IsBash() {
+			stepType = "bash"
+		}
 		run.Steps[i] = StepStatus{
-			ID:     step.ID,
-			Agent:  step.Agent,
+			ID:    step.ID,
+			Type:  stepType,
+			Agent: step.Agent,
 			Status: StatusPending,
 		}
 	}
@@ -293,6 +287,12 @@ Context:
 	// Inject Artifact Dir
 	resolvedEnv = append(resolvedEnv, fmt.Sprintf("ORION_ARTIFACT_DIR=%s", absArtifactDir))
 
+	// Setup log file for this step
+	stepArtifactDir := filepath.Join(e.wm.RootPath, workspace.MetaDir, workspace.RunsDir, run.ID, "artifacts", stepDef.ID)
+	_ = os.MkdirAll(stepArtifactDir, 0755)
+	logFile := filepath.Join(stepArtifactDir, "agent.log")
+	step.LogPath = logFile
+
 	// 8. Execute Agent
 	// Check if provider has a custom command template in config.yaml
 	config, err = e.wm.GetConfig()
@@ -349,11 +349,12 @@ Context:
 set -x
 # Inject Authentication Context
 %s
-%s
+# Execute command and tee output to log
+%s 2>&1 | tee %q
 EXIT_CODE=$?
 echo $EXIT_CODE > .agent_exit_code
 exit $EXIT_CODE
-`, authEnvInjection, cmdStr)
+`, authEnvInjection, cmdStr, logFile)
 
 		scriptPath := filepath.Join(node.WorktreePath, "run_agent.sh")
 		if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
@@ -418,7 +419,8 @@ exit $EXIT_CODE
 		if err != nil {
 			return fmt.Errorf("agent execution failed: %w", err)
 		}
-		_ = output
+		// Write output to log file
+		_ = os.WriteFile(logFile, []byte(output), 0644)
 	}
 
 	// 8. Commit Changes

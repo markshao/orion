@@ -370,6 +370,7 @@ func (wm *WorkspaceManager) SpawnNode(nodeName, logicalBranch, baseBranch, label
 		WorktreePath:  worktreePath,
 		Label:         label,
 		CreatedBy:     "user",
+		Status:        types.StatusWorking,
 		CreatedAt:     time.Now(),
 		// TmuxSession is empty initially
 	}
@@ -537,6 +538,23 @@ func (wm *WorkspaceManager) RemoveNode(nodeName string) error {
 	// 6. Update VSCode Workspace
 	if err := wm.SyncVSCodeWorkspace(); err != nil {
 		fmt.Printf("Warning: Failed to update VSCode workspace file: %v\n", err)
+	}
+
+	return nil
+}
+
+// UpdateNodeStatus updates the status of a node and persists the state.
+func (wm *WorkspaceManager) UpdateNodeStatus(nodeName string, status types.NodeStatus) error {
+	node, exists := wm.State.Nodes[nodeName]
+	if !exists {
+		return fmt.Errorf("node '%s' does not exist", nodeName)
+	}
+
+	node.Status = status
+	wm.State.Nodes[nodeName] = node
+
+	if err := wm.SaveState(); err != nil {
+		return fmt.Errorf("failed to save state: %w", err)
 	}
 
 	return nil

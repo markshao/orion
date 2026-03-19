@@ -29,13 +29,14 @@ type Run struct {
 }
 
 type StepStatus struct {
-	ID        string    `json:"id"`
-	Agent     string    `json:"agent"`
-	Status    RunStatus `json:"status"`
-	StartTime time.Time `json:"start_time,omitempty"`
-	EndTime   time.Time `json:"end_time,omitempty"`
-	NodeName  string    `json:"node_name,omitempty"`
-	ShadowBranch string `json:"shadow_branch,omitempty"`
-	LogPath   string    `json:"log_path,omitempty"`
-	Error     string    `json:"error,omitempty"`
+	ID           string    `json:"id"`
+	Type         string    `json:"type"`                     // "agent" or "bash"
+	Agent        string    `json:"agent,omitempty"`          // for agent steps
+	Status       RunStatus `json:"status"`
+	StartTime    time.Time `json:"start_time,omitempty"`
+	EndTime      time.Time `json:"end_time,omitempty"`
+	NodeName     string    `json:"node_name,omitempty"`
+	ShadowBranch string    `json:"shadow_branch,omitempty"`
+	LogPath      string    `json:"log_path,omitempty"`
+	Error        string    `json:"error,omitempty"`
 }

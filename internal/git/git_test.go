@@ -4,7 +4,6 @@ import (
     "os"
     "os/exec"
     "path/filepath"
-    "strings"
     "testing"
 )
 
@@ -181,41 +180,6 @@ func TestSquashMerge(t *testing.T) {
     out, _ := exec.Command("git", "-C", repoPath, "log", "-1", "--pretty=%s").Output()
     if string(out) != "Squash feature\n" {
         t.Errorf("Commit message mismatch. Got: %s", string(out))
-    }
-}
-
-func TestInstallPrePushHook(t *testing.T) {
-    repoPath, cleanup := setupTestRepo(t)
-    defer cleanup()
-
-    if err := InstallPrePushHook(repoPath); err != nil {
-        t.Fatalf("InstallPrePushHook failed: %v", err)
-    }
-
-    hookPath := filepath.Join(repoPath, ".git", "hooks", "pre-push")
-    info, err := os.Stat(hookPath)
-    if err != nil {
-        t.Fatalf("pre-push hook not created: %v", err)
-    }
-
-    // 至少对 owner 可执行
-    if info.Mode()&0100 == 0 {
-        t.Errorf("pre-push hook is not executable")
-    }
-
-    data, err := os.ReadFile(hookPath)
-    if err != nil {
-        t.Fatalf("failed to read pre-push hook: %v", err)
-    }
-
-    content := string(data)
-    if !strings.Contains(content, "Orion Hook") {
-        t.Errorf("pre-push hook missing Orion marker, got: %s", content)
-    }
-
-    expected := "orion workflow run default --trigger push &"
-    if !strings.Contains(content, expected) {
-        t.Errorf("pre-push hook does not contain expected command.\nExpected to contain: %s\nGot:\n%s", expected, content)
     }
 }
 

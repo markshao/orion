@@ -1,0 +1,44 @@
+name: release-workflow
+
+trigger:
+  event: manual
+
+pipeline:
+  # Step 1: Agent rebases human node onto main and resolves conflicts
+  - id: rebase
+    type: agent
+    agent: rebase-agent
+    base-branch: ${input.node.branch}
+
+  # Step 2: Ensure the shadow branch has commits (agent may not have committed)
+  - id: commit-check
+    type: bash
+    node: ${steps.rebase.node}
+    run: |
+      # Check if there are uncommitted changes
+      if ! git diff --cached --quiet 2>/dev/null || ! git diff --quiet 2>/dev/null; then
+        echo "Uncommitted changes found, committing..."
+        git add -A
+        git commit -m "chore: rebase and resolve conflicts"
+      else
+        echo "No uncommitted changes, checking for empty commits..."
+      fi
+      
+      # Ensure we have at least one commit (create empty commit if needed)
+      # This ensures the branch exists and can be merged
+      echo "Rebase step completed on branch: $(git branch --show-current)"
+      echo "Commit log:"
+      git log --oneline -3
+    depends_on: [rebase]
+
+  # Step 3: Merge the rebased shadow branch back to human node
+  - id: merge
+    type: bash
+    node: ${input.node}
+    run: |
+      echo "Merging ${ORION_TARGET_BRANCH} into ${ORION_TARGET_NODE}..."
+      git merge ${ORION_TARGET_BRANCH} --no-edit -m "chore: merge rebased changes"
+      echo "Merge completed successfully!"
+      echo "Branch is ready to push:"
+      git log --oneline -3
+    depends_on: [commit-check]

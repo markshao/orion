@@ -6,6 +6,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"orion/internal/types"
 	"orion/internal/tmux"
 	"orion/internal/workflow"
 	"orion/internal/workspace"
@@ -16,7 +17,7 @@ import (
 
 var inspectCmd = &cobra.Command{
 	Use:               "inspect [node_name]",
-	Short:             "Inspect a development node and its workflows",
+	Short:             "Inspect a development node",
 	Args:              cobra.MaximumNArgs(1),
 	ValidArgsFunction: CompleteNodeNames,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -123,8 +124,12 @@ var inspectCmd = &cobra.Command{
 		}
 
 		fmt.Println("\n💡 Actions")
-		fmt.Printf("  To merge workflow changes: orion apply %s\n", nodeName)
-		fmt.Printf("  To enter this node:        orion enter %s\n", nodeName)
+		fmt.Printf("  To enter this node: orion enter %s\n", nodeName)
+		
+		// Show push hint if node is ready to push
+		if node.Status == types.StatusReadyToPush {
+			fmt.Printf("  To push branch:     orion push %s\n", nodeName)
+		}
 	},
 }
 

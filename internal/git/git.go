@@ -3,35 +3,9 @@ package git
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
-
-// InstallPrePushHook installs a git hook to trigger Orion workflow on push.
-func InstallPrePushHook(repoPath string) error {
-	hookDir := filepath.Join(repoPath, ".git", "hooks")
-	if _, err := os.Stat(hookDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(hookDir, 0755); err != nil {
-			return fmt.Errorf("failed to create hooks directory: %w", err)
-		}
-	}
-
-	hookPath := filepath.Join(hookDir, "pre-push")
-	content := `#!/bin/sh
-# Orion Hook: Trigger workflow on push
-
-echo "🐝 Orion: Push detected, triggering workflow..."
-orion workflow run default --trigger push &
-`
-
-	if err := os.WriteFile(hookPath, []byte(content), 0755); err != nil {
-		return fmt.Errorf("failed to write pre-push hook: %w", err)
-	}
-
-	return nil
-}
 
 // MergeWorktree merges sourceBranch into the current branch of the worktree.
 func MergeWorktree(worktreePath, sourceBranch string, squash bool) error {
@@ -236,6 +210,17 @@ func CommitWorktree(worktreePath, message string) error {
 	cmd.Dir = worktreePath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git commit failed: %s: %w", string(output), err)
+	}
+	return nil
+}
+
+// PushBranch pushes a branch to the remote repository.
+// It pushes from the main repo, not from a worktree.
+func PushBranch(repoPath, branch string) error {
+	cmd := exec.Command("git", "push", "origin", branch)
+	cmd.Dir = repoPath
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git push failed: %s: %w", string(output), err)
 	}
 	return nil
 }

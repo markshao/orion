@@ -17,7 +17,6 @@ orion init https://github.com/user/repo.git
 此命令会：
 - 将主仓库克隆到 `main_repo/`。
 - 创建 `.orion/` 配置目录。
-- 安装 Git pre-push hook 实现工作流自动化（在 `git push` 时触发）。
 
 ## 2. 创建节点 (Spawn)
 

@@ -17,7 +17,6 @@ orion init https://github.com/user/repo.git
 This command:
 - Clones the main repository into `main_repo/`.
 - Creates `.orion/` configuration directory.
-- Installs Git pre-push hook for workflow automation (triggers on `git push`).
 
 ## 2. Spawn a Node
 

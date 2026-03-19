@@ -1,0 +1,7 @@
+name: rebase-agent
+
+runtime:
+  provider: qwen
+  model: qwen-max
+
+prompt: rebase.md

@@ -64,14 +64,6 @@ Clones the repository into a 'repo' subdirectory and sets up configuration.`,
 			fmt.Printf("Warning: Failed to create VSCode workspace file: %v\n", err)
 		}
 
-		// 5. Install Git Hooks (V1 Feature)
-		fmt.Println("Installing Git hooks...")
-		if err := git.InstallPrePushHook(wm.State.RepoPath); err != nil {
-			fmt.Printf("Warning: Failed to install pre-push hook: %v\n", err)
-		} else {
-			fmt.Println("✔ Git pre-push hook installed.")
-		}
-
 		fmt.Println("Workspace initialized successfully!")
 		fmt.Printf("Orion is ready in %s\n", absPath)
 	},

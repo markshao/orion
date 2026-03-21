@@ -15,6 +15,7 @@ type SpawnPlan struct {
 	BranchName string `json:"branch_name"` // 如: feature/user-login
 	NodeName   string `json:"node_name"`   // 如: user-login-dev
 	BaseBranch string `json:"base_branch"` // 如: main, release/v1.2
+	Label      string `json:"label"`       // 一句话任务摘要 (same language as input)
 }
 
 // Client 是 langchaingo 封装的 AI 客户端
@@ -51,7 +52,7 @@ func (c *Client) GenerateSpawnPlan(description string) (*SpawnPlan, error) {
 	ctx := context.Background()
 
 	// 构建 system prompt
-	systemPrompt := `你是一个 Git 分支命名专家。根据用户的开发任务描述，生成合适的分支名和 node 名。
+	systemPrompt := `你是一个 Git 分支命名专家。根据用户的开发任务描述，生成合适的分支名、node 名和任务摘要 label。
 
 命名规则:
 - 分支名格式: feature/xxx, fix/xxx, chore/xxx (kebab-case)
@@ -61,17 +62,23 @@ func (c *Client) GenerateSpawnPlan(description string) (*SpawnPlan, error) {
 - 重构/优化用 chore/ 前缀
 - 默认基于 main 分支，除非用户明确指定其他分支
 
+label 规则:
+- 用和用户描述相同的语言
+- 1 行，尽量简短
+- 描述“要做什么”，不要写步骤，不要加引号
+
 你必须以 JSON 格式输出，不要包含任何其他解释或 markdown 标记:
 {
   "branch_name": "分支名",
   "node_name": "node 名",
-  "base_branch": "基础分支名"
+  "base_branch": "基础分支名",
+  "label": "一句话任务摘要"
 }`
 
 	// 构建用户 prompt
 	userPrompt := fmt.Sprintf(`开发任务描述: "%s"
 
-请分析上述描述，生成合适的分支名、node 名和基础分支名。`, description)
+请分析上述描述，生成合适的分支名、node 名、基础分支名和一句话任务摘要 label。`, description)
 
 	// 调用 LLM
 	messages := []llms.MessageContent{
@@ -119,6 +126,10 @@ func parseSpawnPlan(content string) (*SpawnPlan, error) {
 	if plan.BaseBranch == "" {
 		plan.BaseBranch = "main"
 	}
+
+	plan.Label = strings.TrimSpace(plan.Label)
+	plan.Label = strings.ReplaceAll(plan.Label, "\n", " ")
+	plan.Label = strings.ReplaceAll(plan.Label, "\r", " ")
 
 	return &plan, nil
 }

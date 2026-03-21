@@ -4,12 +4,31 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"orion/internal/ai"
 	"orion/internal/workspace"
 
 	"github.com/spf13/cobra"
 )
+
+func fallbackLabelFromDescription(description string) string {
+	s := strings.TrimSpace(description)
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\r", " ")
+	s = strings.Join(strings.Fields(s), " ")
+	if s == "" {
+		return ""
+	}
+
+	// Keep it short for selection UIs.
+	const maxRunes = 28
+	if utf8.RuneCountInString(s) <= maxRunes {
+		return s
+	}
+	r := []rune(s)
+	return strings.TrimSpace(string(r[:maxRunes])) + "..."
+}
 
 var aiCmd = &cobra.Command{
 	Use:   "ai <description>",
@@ -65,6 +84,9 @@ Configuration:
 		fmt.Printf("   Branch: %s\n", plan.BranchName)
 		fmt.Printf("   Node: %s\n", plan.NodeName)
 		fmt.Printf("   Base: %s\n", plan.BaseBranch)
+		if strings.TrimSpace(plan.Label) != "" {
+			fmt.Printf("   Label: %s\n", plan.Label)
+		}
 
 		// Get current directory
 		cwd, err := os.Getwd()
@@ -95,11 +117,15 @@ Configuration:
 
 		// Execute spawn
 		fmt.Printf("\n🚀 Creating node '%s'...\n", plan.NodeName)
-		if err := wm.SpawnNode(plan.NodeName, plan.BranchName, plan.BaseBranch, "", false); err != nil {
+		label := strings.TrimSpace(plan.Label)
+		if label == "" {
+			label = fallbackLabelFromDescription(description)
+		}
+		if err := wm.SpawnNode(plan.NodeName, plan.BranchName, plan.BaseBranch, label, false); err != nil {
 			// Check if branch already exists, if so, try without baseBranch
 			if strings.Contains(err.Error(), "invalid") && strings.Contains(err.Error(), "Provide --base to create it") {
 				fmt.Printf("   Branch '%s' already exists, creating worktree on this branch...\n", plan.BranchName)
-				if err := wm.SpawnNode(plan.NodeName, plan.BranchName, "", "", false); err != nil {
+				if err := wm.SpawnNode(plan.NodeName, plan.BranchName, "", label, false); err != nil {
 					fmt.Printf("❌ Creation failed: %v\n", err)
 					os.Exit(1)
 				}

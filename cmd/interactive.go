@@ -3,8 +3,10 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
+	"orion/internal/types"
 	"orion/internal/workflow"
 	"orion/internal/workspace"
 
@@ -33,9 +35,33 @@ func SelectNode(wm *workspace.WorkspaceManager, action string, onlyHuman bool) (
 		return "", fmt.Errorf("no active nodes found to %s", action)
 	}
 
+	sort.Strings(nodeNames)
+
+	var items []string
+	for _, name := range nodeNames {
+		node := wm.State.Nodes[name]
+		label := strings.TrimSpace(node.Label)
+		if label == "" {
+			label = "-"
+		}
+
+		branch := node.LogicalBranch
+		if strings.TrimSpace(branch) == "" {
+			branch = "-"
+		}
+
+		// Keep it compact: name | label | branch | status
+		status := string(node.Status)
+		if status == "" {
+			status = string(types.StatusWorking)
+		}
+
+		items = append(items, fmt.Sprintf("%s | %s | %s | %s", name, label, branch, status))
+	}
+
 	prompt := promptui.Select{
 		Label: fmt.Sprintf("Select a node to %s", action),
-		Items: nodeNames,
+		Items: items,
 		Size:  10,
 		Templates: &promptui.SelectTemplates{
 			Label:    "{{ . }}?",
@@ -51,6 +77,10 @@ func SelectNode(wm *workspace.WorkspaceManager, action string, onlyHuman bool) (
 			os.Exit(0)
 		}
 		return "", err
+	}
+	parts := strings.Split(result, " | ")
+	if len(parts) > 0 && parts[0] != "" {
+		return parts[0], nil
 	}
 	return result, nil
 }

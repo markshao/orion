@@ -39,6 +39,14 @@ func CompleteNodeNamesForFlag(cmd *cobra.Command, args []string, toComplete stri
 	return getNodeNames(nil)
 }
 
+// CompleteHumanNodeNamesForFlag is a helper function for flag completion.
+// It only returns "human" nodes (CreatedBy == "user"), hiding agentic nodes by default.
+func CompleteHumanNodeNamesForFlag(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return getNodeNames(func(node types.Node) bool {
+		return node.CreatedBy == "user"
+	})
+}
+
 // getNodeNames returns all node names in the current workspace.
 func getNodeNames(filter func(types.Node) bool) ([]string, cobra.ShellCompDirective) {
 	cwd, err := os.Getwd()

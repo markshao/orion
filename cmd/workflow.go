@@ -644,7 +644,7 @@ func init() {
 	runWorkflowCmd.Flags().StringP("trigger", "t", "manual", "Trigger type (e.g. manual)")
 	runWorkflowCmd.Flags().StringP("node", "n", "", "Target node name (auto-detected if not specified)")
 	// Register completion function for --node flag
-	_ = runWorkflowCmd.RegisterFlagCompletionFunc("node", CompleteNodeNamesForFlag)
+	_ = runWorkflowCmd.RegisterFlagCompletionFunc("node", CompleteHumanNodeNamesForFlag)
 
 	rmWorkflowCmd.Flags().BoolP("force", "f", false, "Force remove run and all its agentic nodes")
 	lsWorkflowCmd.Flags().BoolP("quiet", "q", false, "Only output run IDs (for piping)")

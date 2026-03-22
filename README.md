@@ -5,7 +5,7 @@
 
 [**English**](README.md) | [**简体中文**](README_zh-CN.md)
 
-**Orion** is a CLI tool designed for the **Agentic DevOps** era. It virtualizes your local development environment, allowing you to collaborate with AI Agents as if they were teammates sitting next to you.
+**Orion** is a CLI tool for the **Agentic DevOps** era. It virtualizes your local development environment so you can develop in isolated nodes and hand off integration work to AI agents running in parallel worktrees.
 
 ## 🌌 Why "Orion"?
 
@@ -24,35 +24,35 @@ Traditional DevOps relies on remote CI/CD pipelines—slow, stateless, and disco
 
 ### Local Agentic DevOps
 
-Local Agentic DevOps means **bringing CI-like automation onto your local machine**, with AI agents running as first-class teammates:
+Local Agentic DevOps means **bringing CI-like integration work onto your local machine**, with AI agents running as first-class teammates:
 
-- **Human Node**: you code in an isolated worktree + tmux session and commit normally.
-- **Local Pipeline**: the commit triggers a workflow pipeline.
-- **Agentic Nodes**: each pipeline step runs in its own isolated worktree + tmux session on a shadow branch.
-- **Apply Loop**: when the workflow is successful, you apply/merge the workflow result back onto your Human Node branch.
+- **Human Node**: you create a branch and node, code in an isolated worktree + tmux session, and commit normally.
+- **Release Workflow**: when your feature is ready, you run `release-workflow` on that node.
+- **Agentic Nodes**: workflow steps run in isolated worktrees + tmux sessions on shadow branches.
+- **Ready to Push**: when the workflow succeeds, Orion marks the human node as `READY_TO_PUSH`.
+- **Push**: you publish the validated branch with `orion push`.
 
-### The Local Pipeline (Release Workflow Example)
+### The Recommended Flow
 
-Orion allows you to configure `.orion/workflows/*.yaml` to define how agents interact with your codebase. A powerful built-in example is the **Release Workflow**:
+Orion allows you to configure `.orion/workflows/*.yaml` to define how agents interact with your codebase. The recommended built-in path is the **Release Workflow**:
 
-When you are ready to ship your feature, you can trigger:
-```bash
-orion workflow run release-workflow <node-name>
-```
+1. Use `orion ai` to generate a branch name and node name from a natural-language task.
+2. Enter the human node and develop normally.
+3. Commit your code on the human node.
+4. Run `orion workflow run release-workflow --node <node-name>`.
+5. Orion creates an isolated agentic node on a shadow branch.
+6. The agent rebases onto the target base branch, resolves conflicts, and prepares the branch for integration.
+7. If the workflow succeeds, the human node status becomes `READY_TO_PUSH`.
+8. Run `orion push <node-name>` to publish the branch.
 
-Under the hood, Orion parses the workflow into steps:
-1. **Agent Step (`rebase`)**: Orion creates an isolated `Agentic Node` (with its own Git Worktree on a Shadow Branch). The AI Agent rebases your feature branch onto `main`, automatically resolves conflicts, runs tests, and commits the result.
-2. **Bash Step (`commit-check`)**: A lightweight script verifies the git status to ensure the shadow branch is in a clean, committable state.
-3. **Bash Step (`merge`)**: Automatically fast-forwards or merges the resolved shadow branch back into your `Human Node`.
-
-This mechanism allows you to offload tedious tasks (like conflict resolution) to agents safely in the background, without ever polluting your main working directory.
+This lets you offload rebasing and conflict resolution to agents without polluting your main working directory.
 
 <img src="assets/diagrams/local-agentic-devops.png" alt="Local Agentic DevOps diagram" width="900" />
 
-1.  **You Code**: Work in your Human Node.
-2.  **Agents React**: On every commit, Orion spins up Agent Nodes.
-3.  **Parallel Execution**: While you continue coding, Agent 1 writes tests, Agent 2 reviews code.
-4.  **Loop Closed**: You use `orion apply` to merge the Agents' work back into your branch when you are ready.
+1.  **Create**: Use AI to create a branch and human node.
+2.  **Code**: Work and commit in your Human Node.
+3.  **Delegate**: Run a workflow to let Agent Nodes handle rebase and conflict resolution.
+4.  **Publish**: Push the validated result once the node becomes `READY_TO_PUSH`.
 
 ---
 
@@ -78,7 +78,7 @@ See [Installation Guide](user-guide/installation.md) for building from source.
 orion init https://github.com/user/repo.git
 ```
 
-#### 2. Start Coding (Human Node)
+#### 2. Create Your Human Node
 
 **Option A: Manual Creation**
 
@@ -127,20 +127,50 @@ Then enter your development environment:
 orion enter <generated-node-name>
 ```
 
-#### 3. Agent Collaboration
+#### 3. Develop and Commit
 
-When you commit code in `login-dev`, a workflow starts automatically.
+After entering the node, develop normally and commit your changes:
 
 ```bash
-# Check agent status
+orion enter login-dev
+git status
+git add .
+git commit -m "feat: implement login flow"
+```
+
+#### 4. Run the Release Workflow
+
+When your human-node changes are ready, run the built-in release workflow:
+
+```bash
+# Trigger the release workflow on a specific node
+orion workflow run release-workflow --node login-dev
+
+# Check workflow status
 orion workflow ls
 
 # Inspect what the agent did
 orion workflow inspect <run-id>
-
-# Merge agent's changes back to your node
-orion apply login-dev
 ```
+
+The `release-workflow` uses an agentic node on a shadow branch to help with rebase and conflict handling. When the run succeeds, Orion marks the human node as `READY_TO_PUSH`.
+
+#### 5. Push the Result
+
+```bash
+orion inspect login-dev
+orion push login-dev
+```
+
+#### 6. Customize Workflows
+
+You are not limited to the built-in release workflow. Orion can be extended through:
+
+- `.orion/workflows/*.yaml` for workflow definitions
+- `.orion/agents/*.yaml` for agent runtime configuration
+- `.orion/prompts/*` for agent prompts and task instructions
+
+That lets you define your own agentic nodes and automation steps beyond rebasing and conflict resolution.
 
 ---
 
@@ -167,7 +197,7 @@ source ~/.bashrc
 
 - [**Installation Guide**](user-guide/installation.md): Requirements and setup.
 - [**Human Node Guide**](user-guide/human-node.md): Managing your workspace and VSCode integration.
-- [**Agentic Workflow Guide**](user-guide/workflow.md): Configuring agents, triggers, and the apply loop.
+- [**Agentic Workflow Guide**](user-guide/workflow.md): Configuring workflows, agents, and release automation.
 
 ---
 

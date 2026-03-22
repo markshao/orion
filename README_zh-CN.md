@@ -5,7 +5,7 @@
 
 [**English**](README.md) | [**简体中文**](README_zh-CN.md)
 
-**Orion** 是专为 **Agentic DevOps** 时代设计的 CLI 工具。它虚拟化了你的本地开发环境，让你能够与 AI Agents 像队友一样协同工作。
+**Orion** 是面向 **Agentic DevOps** 时代的 CLI 工具。它将本地开发环境虚拟化，让你可以在隔离节点中开发，并把集成类工作交给并行运行的 AI Agents。
 
 ## 🌌 为什么叫 "Orion"?
 
@@ -23,28 +23,28 @@
 
 ### Local Agentic DevOps
 
-Local Agentic DevOps 的核心是：把 CI/流水线能力带到你的本地机器上，让 AI Agents 以“本地队友”的方式参与研发闭环：
+Local Agentic DevOps 的核心是：把 CI/集成类工作带回本地，让 AI Agents 以“本地队友”的方式参与研发闭环：
 
-- **Human Node（人类节点）**：你在隔离的 worktree + tmux session 里正常开发与 commit。
-- **Local Pipeline（本地流水线）**：commit 触发 workflow pipeline。
-- **Agentic Nodes（智能体节点）**：流水线里的每个 step 都会启动一个独立的 worktree + tmux session，并在对应的 shadow branch 上执行任务。
-- **Apply Loop（回归闭环）**：workflow 成功后，通过 `orion apply` 将 workflow 的结果分支合并回 Human Node 的分支。
+- **Human Node（人类节点）**：你先创建 branch 和 node，再在隔离的 worktree + tmux session 里正常开发与 commit。
+- **Release Workflow（发版工作流）**：当特性准备就绪后，你在该节点上运行 `release-workflow`。
+- **Agentic Nodes（智能体节点）**：workflow 里的 step 会启动独立的 worktree + tmux session，并在 shadow branch 上执行任务。
+- **Ready to Push（可推送状态）**：workflow 成功后，Orion 会把 human node 标记为 `READY_TO_PUSH`。
+- **Push（发布）**：最后通过 `orion push` 推送结果分支。
 
-### 本地流水线 (Release Workflow 示例)
+### 推荐开发流程
  
- Orion 允许你通过配置 `.orion/workflows/*.yaml` 来定义 Agents 如何与你的代码库交互。一个强大的内置示例是 **发版工作流 (Release Workflow)**：
+ Orion 允许你通过配置 `.orion/workflows/*.yaml` 来定义 Agents 如何与你的代码库交互。当前推荐的内置主路径是 **发版工作流 (Release Workflow)**：
+
+ 1. 使用 `orion ai` 根据自然语言生成 branch 名和 node 名。
+ 2. 进入 human node，正常开发。
+ 3. 在 human node 上提交代码。
+ 4. 运行 `orion workflow run release-workflow --node <node-name>`。
+ 5. Orion 创建隔离的 agentic node，并基于 shadow branch 执行 workflow。
+ 6. Agent 负责 rebase、处理冲突，并准备好可集成结果。
+ 7. 如果 workflow 成功，human node 状态会变成 `READY_TO_PUSH`。
+ 8. 运行 `orion push <node-name>` 推送分支。
  
- 当你的特性开发完毕准备发版时，可以执行：
- ```bash
- orion workflow run release-workflow <node-name>
- ```
- 
- 在底层，Orion 会将工作流解析为多个有序步骤执行：
- 1. **Agent 步骤 (`rebase`)**：Orion 临时创建一个隔离的 `Agentic Node`（基于影子分支的独立 Worktree）。AI Agent 在这里把你的特性分支变基 (Rebase) 到 `main` 分支，自动解决潜在的代码冲突，运行测试并提交结果。
- 2. **Bash 步骤 (`commit-check`)**：执行一个轻量级的脚本进行兜底，确保工作流中的 git 状态干净且可被合并。
- 3. **Bash 步骤 (`merge`)**：自动将处理好冲突的影子分支合并 (Merge) 回你的 `Human Node`。
- 
- 这种机制让你能够安全地把解决冲突等繁琐任务抛给后台的 Agents，且**绝对不会污染你当前的主工作区**。
+ 这种机制让你能够安全地把 rebase、冲突处理等繁琐任务抛给后台的 Agents，且**不会污染你当前的主工作区**。
  
  <img src="assets/diagrams/local-agentic-devops.png" alt="Local Agentic DevOps diagram" width="900" />
 
@@ -71,7 +71,7 @@ curl -fsSL https://raw.githubusercontent.com/markshao/orion/main/install.sh | ba
 orion init https://github.com/user/repo.git
 ```
 
-#### 2. 开始编码 (Human Node)
+#### 2. 创建 Human Node
 
 **方式 A: 手动创建**
 
@@ -120,19 +120,50 @@ model: "kimi-k2-turbo-preview"
 orion enter <生成的节点名>
 ```
 
-#### 3. Agent 协作
-当你在 `login-dev` 中提交代码时，工作流会自动开始。
+#### 3. 开发并提交
+
+进入节点后，按正常开发流程提交代码：
 
 ```bash
-# 查看 Agent 状态
+orion enter login-dev
+git status
+git add .
+git commit -m "feat: implement login flow"
+```
+
+#### 4. 运行 Release Workflow
+
+当 human node 上的代码准备好之后，运行内置的 release workflow：
+
+```bash
+# 在指定节点上触发 release workflow
+orion workflow run release-workflow --node login-dev
+
+# 查看 workflow 状态
 orion workflow ls
 
 # 检查 Agent 做了什么
 orion workflow inspect <run-id>
-
-# 将 Agent 的更改变更回你的节点
-orion apply login-dev
 ```
+
+`release-workflow` 会在 shadow branch 上启动 agentic node，帮助你完成 rebase 和冲突处理。workflow 成功后，Orion 会把 human node 标记为 `READY_TO_PUSH`。
+
+#### 5. 推送结果
+
+```bash
+orion inspect login-dev
+orion push login-dev
+```
+
+#### 6. 自定义 Workflows
+
+你并不局限于内置的 release workflow。Orion 支持通过以下方式扩展：
+
+- `.orion/workflows/*.yaml`：定义 workflow
+- `.orion/agents/*.yaml`：配置 agent 运行时
+- `.orion/prompts/*`：定义 agent prompt 和任务说明
+
+这意味着你可以围绕自己的研发流程，扩展出更多 agentic nodes 和自动化步骤。
 
 ---
 
@@ -157,7 +188,7 @@ source ~/.bashrc
 
 - [**安装指南**](user-guide/installation_zh-CN.md): 环境要求与设置。
 - [**Human Node 指南**](user-guide/human-node_zh-CN.md): 管理工作区与 VSCode 集成。
-- [**Agentic Workflow 指南**](user-guide/workflow_zh-CN.md): 配置 Agent、触发器与回归闭环。
+- [**Agentic Workflow 指南**](user-guide/workflow_zh-CN.md): 配置 workflows、agents 与发版自动化。
 
 ---
 

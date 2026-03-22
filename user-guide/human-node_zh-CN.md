@@ -6,11 +6,9 @@
 
 ## 1. 初始化工作区
 
-首先，为你的项目创建一个目录并初始化 Orion：
+为你的项目初始化 Orion：
 
 ```bash
-mkdir my-project_swarm
-cd my-project_swarm
 orion init https://github.com/user/repo.git
 ```
 
@@ -18,9 +16,19 @@ orion init https://github.com/user/repo.git
 - 将主仓库克隆到 `main_repo/`。
 - 创建 `.orion/` 配置目录。
 
-## 2. 创建节点 (Spawn)
+## 2. 创建 Human Node
 
 创建一个新节点来开发特定功能。
+
+**推荐：使用自然语言创建**
+
+```bash
+orion ai "实现登录流程"
+```
+
+这样 Orion 会自动帮你生成 branch 名和 node 名。
+
+**手动创建**
 
 ```bash
 # 语法: orion spawn <branch> <node-name> --base <base-branch>
@@ -52,7 +60,29 @@ Orion 会自动在根目录维护一个 `Orion.code-workspace` 文件。
 2. 所有活跃的 Human Node (Worktree) 将作为根文件夹出现在资源管理器中。
 3. 你可以在一个窗口中同时编辑多个节点的文件。
 
-## 5. 清理
+## 5. Release Workflow 与 Push
+
+推荐的人类节点工作流如下：
+
+```bash
+# 1. 在节点中开发并提交
+orion enter login-node
+git add .
+git commit -m "feat: implement login flow"
+
+# 2. 运行 release workflow
+orion workflow run release-workflow --node login-node
+
+# 3. 检查状态
+orion inspect login-node
+
+# 4. 当状态变成 READY_TO_PUSH 后执行 push
+orion push login-node
+```
+
+`release-workflow` 会在 shadow branch 上创建 agentic nodes，帮助你完成 rebase 和冲突处理，然后再进入 push 阶段。
+
+## 6. 清理
 
 当你完成任务后：
 
@@ -60,4 +90,4 @@ Orion 会自动在根目录维护一个 `Orion.code-workspace` 文件。
 orion rm login-node
 ```
 
-**安全检查**: 如果有未应用的 Agent 工作流（AI 生成的代码更改尚未合并），`orion rm` 会发出警告以防止数据丢失。
+**安全检查**: 如果该节点还有成功执行但尚未推送的 workflow 结果，`orion rm` 会发出警告，以帮助你避免丢失工作。

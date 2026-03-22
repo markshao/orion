@@ -39,6 +39,20 @@ go build -o bin/orion main.go
 export PATH=$PWD/bin:$PATH
 ```
 
+## Local Install (Override /usr/local/bin)
+
+If you are developing Orion locally and want to install/override the binary under `/usr/local/bin`:
+
+```bash
+make local-install
+```
+
+To uninstall:
+
+```bash
+make uninstall
+```
+
 ## Verification (验证安装)
 
 Run the following command to verify the installation:

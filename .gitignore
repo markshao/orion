@@ -39,6 +39,7 @@ playground/*
 # Build artifacts
 bin/
 dist/
+.cache/
 
 # Binary
 orion

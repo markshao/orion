@@ -39,6 +39,20 @@ go build -o bin/orion main.go
 export PATH=$PWD/bin:$PATH
 ```
 
+## 本地安装（覆盖 /usr/local/bin）
+
+如果你在本地开发 Orion，并希望直接安装/覆盖 `/usr/local/bin/orion` 用于调试：
+
+```bash
+make local-install
+```
+
+卸载：
+
+```bash
+make uninstall
+```
+
 ## 验证安装
 
 运行以下命令验证安装是否成功：

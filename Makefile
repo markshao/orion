@@ -1,16 +1,35 @@
-.PHONY: build clean run
+.PHONY: all build local-install install uninstall run clean
 
 APP_NAME := orion
 BUILD_DIR := bin
+BIN_PATH := $(BUILD_DIR)/$(APP_NAME)
+PREFIX ?= /usr/local
+INSTALL_DIR ?= $(PREFIX)/bin
+INSTALL_PATH := $(INSTALL_DIR)/$(APP_NAME)
+GOCACHE ?= $(CURDIR)/.cache/go-build
+GOENV := GOCACHE=$(GOCACHE)
 
 all: build
 
 build:
 	@mkdir -p $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/$(APP_NAME) main.go
+	@mkdir -p $(GOCACHE)
+	$(GOENV) go build -o $(BIN_PATH) main.go
+
+local-install: build
+	sudo install -m 0755 $(BIN_PATH) $(INSTALL_PATH)
+
+install: local-install
+
+uninstall:
+	sudo rm -f $(INSTALL_PATH)
+
+test:
+	@mkdir -p $(GOCACHE)
+	$(GOENV) go test ./...
 
 run: build
-	./$(BUILD_DIR)/$(APP_NAME)
+	./$(BIN_PATH)
 
 clean:
 	rm -rf $(BUILD_DIR)

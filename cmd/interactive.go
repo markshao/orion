@@ -16,22 +16,30 @@ import (
 // SelectNode prompts the user to select a node from the active nodes in the workspace.
 // Returns the selected node name or an empty string if cancelled/failed.
 func SelectNode(wm *workspace.WorkspaceManager, action string, onlyHuman bool) (string, error) {
+	return SelectNodeWithFilter(wm, action, func(node types.Node) bool {
+		if onlyHuman && node.CreatedBy != "user" {
+			return false
+		}
+		return true
+	})
+}
+
+// SelectNodeWithFilter prompts the user to select a node matching the provided filter.
+// Returns the selected node name or an empty string if cancelled/failed.
+func SelectNodeWithFilter(wm *workspace.WorkspaceManager, action string, filter func(types.Node) bool) (string, error) {
 	if len(wm.State.Nodes) == 0 {
 		return "", fmt.Errorf("no active nodes found to %s", action)
 	}
 
 	var nodeNames []string
 	for name, node := range wm.State.Nodes {
-		if onlyHuman && node.CreatedBy != "user" {
+		if filter != nil && !filter(node) {
 			continue
 		}
 		nodeNames = append(nodeNames, name)
 	}
 
 	if len(nodeNames) == 0 {
-		if onlyHuman {
-			return "", fmt.Errorf("no active human nodes found to %s", action)
-		}
 		return "", fmt.Errorf("no active nodes found to %s", action)
 	}
 

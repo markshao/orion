@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"orion/internal/types"
 	"orion/internal/workspace"
 
 	"github.com/spf13/cobra"
@@ -18,30 +19,49 @@ func CompleteNodeNames(cmd *cobra.Command, args []string, toComplete string) ([]
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	return getNodeNames()
+	return getNodeNames(nil)
+}
+
+// CompletePushableNodeNames returns human nodes that are ready to push.
+func CompletePushableNodeNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) > 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return getNodeNames(func(node types.Node) bool {
+		return node.CreatedBy == "user" && node.Status == types.StatusReadyToPush
+	})
 }
 
 // CompleteNodeNamesForFlag is a helper function for flag completion.
 // Unlike CompleteNodeNames, it doesn't check args length, making it suitable for flag completion.
 func CompleteNodeNamesForFlag(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	return getNodeNames()
+	return getNodeNames(nil)
 }
 
 // getNodeNames returns all node names in the current workspace.
-func getNodeNames() ([]string, cobra.ShellCompDirective) {
+func getNodeNames(filter func(types.Node) bool) ([]string, cobra.ShellCompDirective) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
 
-	wm, err := workspace.NewManager(cwd)
+	rootPath, err := workspace.FindWorkspaceRoot(cwd)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	wm, err := workspace.NewManager(rootPath)
 	if err != nil {
 		// If we can't load the workspace (e.g. not in a workspace), return error or empty
 		return nil, cobra.ShellCompDirectiveError
 	}
 
 	var nodeNames []string
-	for name := range wm.State.Nodes {
+	for name, node := range wm.State.Nodes {
+		if filter != nil && !filter(node) {
+			continue
+		}
 		nodeNames = append(nodeNames, name)
 	}
 

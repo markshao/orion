@@ -167,15 +167,26 @@ orion push login-dev
 
 #### 7. Bare Repo Git 操作
 
-Orion 会把 Git 数据存放在 `repo.git/`，把可编辑代码放在各个 node worktree 中。不带 `-w` 的 `orion run` 只用于 Git 操作，比如 fetch、打 tag、推 tag：
+Orion 会把 Git 数据存放在 `repo.git/`，把可编辑代码放在各个 node worktree 中。
+不带 `-w` 的 `orion run` 只适用于不依赖工作树的 Git 命令，比如 fetch、log、打 tag、推 tag：
 
 ```bash
 orion run git fetch origin
+orion run git log --oneline -5
 orion run git tag v1.0.0
 orion run git push --tags
 ```
 
-凡是需要工作树的命令，都应使用 `orion run -w <node>`。
+凡是需要工作树的命令，都应使用 `orion run -w <node>`：
+
+```bash
+orion run -w login-dev git status
+orion run -w login-dev git pull
+orion run -w login-dev go test ./...
+orion run -w login-dev make build
+```
+
+像 `git status`、`git pull`、`git diff`，以及 `ls` 这类普通 shell 命令，都必须在 node worktree 中执行，不能直接在 `repo.git/` 里跑。
 
 ---
 

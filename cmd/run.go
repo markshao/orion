@@ -19,8 +19,50 @@ var (
 	runWorktree string
 )
 
+var gitWorktreeRequiredSubcommands = map[string]struct{}{
+	"add":             {},
+	"am":              {},
+	"apply":           {},
+	"bisect":          {},
+	"checkout":        {},
+	"cherry-pick":     {},
+	"clean":           {},
+	"commit":          {},
+	"diff":            {},
+	"grep":            {},
+	"merge":           {},
+	"mv":              {},
+	"pull":            {},
+	"rebase":          {},
+	"reset":           {},
+	"restore":         {},
+	"revert":          {},
+	"rm":              {},
+	"show":            {},
+	"sparse-checkout": {},
+	"stash":           {},
+	"status":          {},
+	"switch":          {},
+}
+
 func isGitCommand(args []string) bool {
 	return len(args) > 0 && args[0] == "git"
+}
+
+func requiresWorktree(args []string) bool {
+	if !isGitCommand(args) || len(args) < 2 {
+		return false
+	}
+
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		if !strings.HasPrefix(arg, "-") {
+			_, exists := gitWorktreeRequiredSubcommands[arg]
+			return exists
+		}
+	}
+
+	return false
 }
 
 // isSubDir checks if child is a subdirectory of parent (or the same directory)
@@ -139,6 +181,12 @@ Examples:
 			fmt.Println("Use `orion run -w <node> ...` to run build, test, or other worktree commands.")
 			os.Exit(1)
 		}
+		if targetWorktree == "" && requiresWorktree(commandArgs) {
+			fmt.Printf("Error: `git %s` requires a worktree.\n", firstGitSubcommand(commandArgs))
+			fmt.Println("Use `orion run -w <node> ...` to run worktree-dependent git commands.")
+			fmt.Println("Bare repo usage is intended for commands like `git fetch`, `git tag`, `git push`, and `git log`.")
+			os.Exit(1)
+		}
 
 		// 找到 workspace root
 		cwd, err := os.Getwd()
@@ -238,6 +286,15 @@ func init() {
 	runCmd.Flags().StringVarP(&runWorktree, "worktree", "w", "", "Specify which node's worktree to execute the command in")
 }
 
+func firstGitSubcommand(args []string) string {
+	for i := 1; i < len(args); i++ {
+		if !strings.HasPrefix(args[i], "-") {
+			return args[i]
+		}
+	}
+	return "command"
+}
+
 // GetRunWorktreePath returns the directory used by `orion run`.
 func GetRunWorktreePath(rootPath, worktreeName string) (string, error) {
 	wm, err := workspace.NewManager(rootPath)
@@ -279,6 +336,12 @@ func ExecuteInWorktree(rootPath, worktreeName string, args []string) (string, in
 	}
 	if worktreeName == "" && !isGitCommand(args) {
 		return "Error: bare repo context only supports git commands.\nUse `orion run -w <node> ...` to run build, test, or other worktree commands.\n", 1, nil
+	}
+	if worktreeName == "" && requiresWorktree(args) {
+		return fmt.Sprintf(
+			"Error: `git %s` requires a worktree.\nUse `orion run -w <node> ...` to run worktree-dependent git commands.\nBare repo usage is intended for commands like `git fetch`, `git tag`, `git push`, and `git log`.\n",
+			firstGitSubcommand(args),
+		), 1, nil
 	}
 
 	command := exec.Command(args[0], args[1:]...)

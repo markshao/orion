@@ -90,6 +90,25 @@ func TestRunInBareRepoAllowsGitCommands(t *testing.T) {
 	}
 }
 
+func TestRunInBareRepoRejectsWorktreeGitCommands(t *testing.T) {
+	rootPath, _, cleanup := setupTestWorkspaceForRun(t)
+	defer cleanup()
+
+	output, exitCode, err := ExecuteInWorktree(rootPath, "", []string{"git", "status"})
+	if err != nil {
+		t.Fatalf("ExecuteInWorktree returned unexpected error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d", exitCode)
+	}
+	if !strings.Contains(output, "requires a worktree") {
+		t.Fatalf("unexpected output: %s", output)
+	}
+	if !strings.Contains(output, "orion run -w <node>") {
+		t.Fatalf("missing worktree guidance in output: %s", output)
+	}
+}
+
 func TestRunInBareRepoRejectsNonGitCommands(t *testing.T) {
 	rootPath, _, cleanup := setupTestWorkspaceForRun(t)
 	defer cleanup()

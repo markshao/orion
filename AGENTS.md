@@ -114,22 +114,25 @@ orion rm auth-test-node
 
 ### 3. `orion run` - 在指定上下文中执行命令
 
-`orion run` 允许你在 `main_repo` 或指定 Node 的 worktree 中执行任意命令，类似于 `uv run` 或 `poetry run`。
+`orion run` 允许你在 bare repo 或指定 Node 的 worktree 中执行命令。
+不带 `-w` 时，默认上下文是 `repo.git/`，只适合不依赖工作树的 Git 操作。
 
 ```bash
-# 在主仓库执行命令（默认行为）
-orion run git status
-orion run git pull
+# 在 bare repo 执行不依赖工作树的 Git 命令（默认行为）
+orion run git fetch origin
 orion run git log --oneline -5
-orion run make build
+orion run git tag v1.0.0
+orion run git push --tags
 
-# 在指定 node 的 worktree 中执行命令
+# 在指定 node 的 worktree 中执行需要工作树的命令
+orion run -w my-node git status
+orion run -w my-node git pull
 orion run -w my-node go test ./...
 orion run --worktree my-node npm run build
 
-# 执行带参数的命令
-orion run ls -la
-orion run echo "Hello from Orion"
+# 在指定 node 的 worktree 中执行普通 shell 命令
+orion run -w my-node ls -la
+orion run -w my-node echo "Hello from Orion"
 ```
 
 **环境变量**：

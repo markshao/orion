@@ -174,15 +174,26 @@ That lets you define your own agentic nodes and automation steps beyond rebasing
 
 #### 7. Bare Repo Git Operations
 
-Orion keeps a bare Git store at `repo.git/` and editable code in node worktrees. Use `orion run` without `-w` for Git-only operations such as fetch, tagging, and pushing tags:
+Orion keeps a bare Git store at `repo.git/` and editable code in node worktrees.
+Use `orion run` without `-w` only for Git commands that do not require a working tree, such as fetch, log, tagging, and pushing tags:
 
 ```bash
 orion run git fetch origin
+orion run git log --oneline -5
 orion run git tag v1.0.0
 orion run git push --tags
 ```
 
-Use `orion run -w <node>` for commands that require a working tree.
+Use `orion run -w <node>` for commands that require a working tree:
+
+```bash
+orion run -w login-dev git status
+orion run -w login-dev git pull
+orion run -w login-dev go test ./...
+orion run -w login-dev make build
+```
+
+Commands like `git status`, `git pull`, `git diff`, and ordinary shell commands such as `ls` must run in a node worktree, not in `repo.git/`.
 
 ---
 

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"orion/internal/git"
-	"orion/internal/tmux"
 	"orion/internal/types"
 	"orion/internal/workspace"
 
@@ -64,7 +63,7 @@ func formatBaseSyncStatus(repoPath string, node types.Node) string {
 	if currentCommit == node.BaseCommit {
 		return color.GreenString("SYNCED")
 	}
-	return color.YellowString("STALE")
+	return color.RedString("STALE")
 }
 
 func init() {
@@ -105,12 +104,11 @@ func sortedNodeNames(nodes map[string]types.Node, showAll bool) []string {
 }
 
 func renderNodeCard(repoPath string, name string, node types.Node) string {
-	sessionStatus := nodeSessionStatus(name)
 	baseStatus := formatBaseSyncStatus(repoPath, node)
-	return renderNodeCardWithSession(name, node, sessionStatus, baseStatus)
+	return renderNodeCardContent(name, node, baseStatus)
 }
 
-func renderNodeCardWithSession(name string, node types.Node, sessionStatus string, baseStatus string) string {
+func renderNodeCardContent(name string, node types.Node, baseStatus string) string {
 	statusStr := string(node.Status)
 	if node.Status == "" {
 		statusStr = string(types.StatusWorking)
@@ -122,23 +120,19 @@ func renderNodeCardWithSession(name string, node types.Node, sessionStatus strin
 	}
 
 	lines := []string{
-		fmt.Sprintf("%s  %s", color.CyanString(name), formatStatus(statusStr)),
-		fmt.Sprintf("  branch   %s", node.LogicalBranch),
-		fmt.Sprintf("  base     %s", baseStatus),
-		fmt.Sprintf("  label    %s", label),
-		fmt.Sprintf("  session  %s", formatSessionStatus(sessionStatus)),
-		fmt.Sprintf("  created  %s", node.CreatedAt.Format("2006-01-02 15:04")),
+		color.CyanString(name),
+		formatNodeField("git", formatStatus(statusStr)),
+		formatNodeField("branch", node.LogicalBranch),
+		formatNodeField("base-sync", baseStatus),
+		formatNodeField("label", label),
+		formatNodeField("created", node.CreatedAt.Format("2006-01-02 15:04")),
 	}
 
 	return strings.Join(lines, "\n") + "\n"
 }
 
-func nodeSessionStatus(name string) string {
-	sessionName := fmt.Sprintf("orion-%s", name)
-	if tmux.SessionExists(sessionName) {
-		return "RUNNING"
-	}
-	return "STOPPED"
+func formatNodeField(label, value string) string {
+	return fmt.Sprintf("  %-9s %s", label, value)
 }
 
 // formatStatus returns a colored string representation of the node status
@@ -154,16 +148,5 @@ func formatStatus(status string) string {
 		return color.HiBlackString("PUSHED")
 	default:
 		return color.YellowString("WORKING")
-	}
-}
-
-func formatSessionStatus(status string) string {
-	switch status {
-	case "RUNNING":
-		return color.GreenString(status)
-	case "STOPPED":
-		return color.HiBlackString(status)
-	default:
-		return status
 	}
 }

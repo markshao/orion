@@ -44,15 +44,15 @@ func TestRenderNodeCardIncludesStableFields(t *testing.T) {
 		CreatedAt:     time.Date(2026, 3, 23, 9, 52, 0, 0, time.UTC),
 	}
 
-	got := renderNodeCardWithSession("bare-repo-dev", node, "STOPPED", "-")
+	got := renderNodeCardContent("bare-repo-dev", node, "-")
 
 	expectedSnippets := []string{
-		"bare-repo-dev  WORKING",
-		"  branch   feature/bare-repo-concept",
-		"  base     -",
-		"  label    -",
-		"  session  STOPPED",
-		"  created  2026-03-23 09:52",
+		"bare-repo-dev",
+		"  git       WORKING",
+		"  branch    feature/bare-repo-concept",
+		"  base-sync -",
+		"  label     -",
+		"  created   2026-03-23 09:52",
 	}
 	for _, snippet := range expectedSnippets {
 		if !strings.Contains(got, snippet) {

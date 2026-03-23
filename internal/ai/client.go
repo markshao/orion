@@ -124,7 +124,7 @@ func parseSpawnPlan(content string) (*SpawnPlan, error) {
 
 	// 设置默认值
 	if plan.BaseBranch == "" {
-		plan.BaseBranch = "main"
+		plan.BaseBranch = "origin/main"
 	}
 
 	plan.Label = strings.TrimSpace(plan.Label)

@@ -25,8 +25,9 @@ func UpdateWorkspaceFile(rootPath string, repoDir string, nodesDir string, nodes
 
 	workspaceFilePath := filepath.Join(rootPath, fmt.Sprintf("%s.code-workspace", projectName))
 
-	folders := []Folder{
-		{Path: repoDir},
+	var folders []Folder
+	if strings.TrimSpace(repoDir) != "" {
+		folders = append(folders, Folder{Path: repoDir})
 	}
 
 	for _, node := range nodes {

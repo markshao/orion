@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	RepoDir       = "main_repo"  // Was "repo"
+	RepoDir       = "repo.git"
 	WorkspacesDir = "workspaces" // Was NodesDir
 	MetaDir       = ".orion"
 	StateFile     = "state.json"
@@ -81,7 +81,7 @@ func (wm *WorkspaceManager) SyncVSCodeWorkspace() error {
 			nodes = append(nodes, name)
 		}
 	}
-	return vscode.UpdateWorkspaceFile(wm.RootPath, RepoDir, WorkspacesDir, nodes)
+	return vscode.UpdateWorkspaceFile(wm.RootPath, "", WorkspacesDir, nodes)
 }
 
 // Init creates a new Orion workspace structure.
@@ -238,15 +238,40 @@ func (wm *WorkspaceManager) SpawnNode(nodeName, logicalBranch, baseBranch, label
 		return fmt.Errorf("node '%s' already exists", nodeName)
 	}
 
-	// 1. Validate logical branch, create if missing and base provided
+	fetchErr := git.Fetch(wm.State.RepoPath)
+	if fetchErr != nil {
+		fmt.Printf("Warning: Failed to fetch origin: %v\n", fetchErr)
+		fmt.Println("Warning: Continuing with cached refs. You may not be developing from the latest remote base.")
+	}
+
+	// 1. Resolve the node creation base.
+	baseRef := strings.TrimSpace(baseBranch)
+	baseCommit := ""
 	if err := git.VerifyBranch(wm.State.RepoPath, logicalBranch); err != nil {
-		if baseBranch == "" {
-			return fmt.Errorf("logical branch '%s' invalid: %w. Provide --base to create it", logicalBranch, err)
+		if baseRef == "" {
+			if remoteBranchRef := fmt.Sprintf("origin/%s", logicalBranch); refExists(wm.State.RepoPath, remoteBranchRef) {
+				baseRef = remoteBranchRef
+			} else {
+				baseRef = wm.defaultBaseRef()
+			}
 		}
 
-		fmt.Printf("Logical branch '%s' not found. Creating from '%s'...\n", logicalBranch, baseBranch)
-		if err := git.CreateBranch(wm.State.RepoPath, logicalBranch, baseBranch); err != nil {
+		var resolveErr error
+		baseCommit, resolveErr = git.ResolveRef(wm.State.RepoPath, baseRef)
+		if resolveErr != nil {
+			return fmt.Errorf("base ref '%s' invalid: %w", baseRef, resolveErr)
+		}
+
+		fmt.Printf("Logical branch '%s' not found. Creating from '%s'...\n", logicalBranch, baseRef)
+		if err := git.CreateBranch(wm.State.RepoPath, logicalBranch, baseRef); err != nil {
 			return err
+		}
+	} else {
+		baseRef = logicalBranch
+		var resolveErr error
+		baseCommit, resolveErr = git.ResolveRef(wm.State.RepoPath, logicalBranch)
+		if resolveErr != nil {
+			return fmt.Errorf("failed to resolve branch '%s': %w", logicalBranch, resolveErr)
 		}
 	}
 
@@ -281,7 +306,10 @@ func (wm *WorkspaceManager) SpawnNode(nodeName, logicalBranch, baseBranch, label
 	newNode := types.Node{
 		Name:          nodeName,
 		LogicalBranch: logicalBranch,
-		BaseBranch:    baseBranch,
+		BaseBranch:    baseRef,
+		BaseRef:       baseRef,
+		BaseCommit:    baseCommit,
+		HeadBranch:    shadowBranch,
 		ShadowBranch:  shadowBranch,
 		WorktreePath:  worktreePath,
 		Label:         label,
@@ -310,6 +338,19 @@ func (wm *WorkspaceManager) SpawnNode(nodeName, logicalBranch, baseBranch, label
 	}
 
 	return nil
+}
+
+func (wm *WorkspaceManager) defaultBaseRef() string {
+	cfg, err := wm.GetConfig()
+	if err == nil && cfg.Git.MainBranch != "" {
+		return fmt.Sprintf("origin/%s", cfg.Git.MainBranch)
+	}
+	return "origin/main"
+}
+
+func refExists(repoPath, ref string) bool {
+	_, err := git.ResolveRef(repoPath, ref)
+	return err == nil
 }
 
 // CreateAgentNode creates a dedicated ephemeral node for an AI agent.
@@ -342,6 +383,9 @@ func (wm *WorkspaceManager) CreateAgentNode(nodeName, shadowBranch, baseBranch, 
 	node := types.Node{
 		Name:          nodeName,
 		LogicalBranch: baseBranch, // Logically related to base
+		BaseBranch:    baseBranch,
+		BaseRef:       baseBranch,
+		HeadBranch:    shadowBranch,
 		ShadowBranch:  shadowBranch,
 		WorktreePath:  worktreePath,
 		Label:         "agent",
@@ -349,6 +393,7 @@ func (wm *WorkspaceManager) CreateAgentNode(nodeName, shadowBranch, baseBranch, 
 		TmuxSession:   sessionName,
 		CreatedAt:     time.Now(),
 	}
+	node.BaseCommit, _ = git.ResolveRef(wm.State.RepoPath, baseBranch)
 
 	if wm.State.Nodes == nil {
 		wm.State.Nodes = make(map[string]types.Node)

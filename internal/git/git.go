@@ -3,7 +3,9 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -29,7 +31,7 @@ func GetChangedFiles(worktreePath, from, to string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("git diff failed: %w", err)
 	}
-	
+
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	var files []string
 	for _, line := range lines {
@@ -98,6 +100,47 @@ func Clone(url, path string) error {
 		return fmt.Errorf("git clone failed: %s: %w", string(output), err)
 	}
 	return nil
+}
+
+// CloneBare clones the repo as a bare repository.
+func CloneBare(url, path string) error {
+	cmd := exec.Command("git", "clone", "--bare", url, path)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git clone --bare failed: %s: %w", string(output), err)
+	}
+	return nil
+}
+
+// Fetch updates remote-tracking refs in the repository.
+func Fetch(repoPath string) error {
+	cmd := exec.Command("git", "fetch", "origin", "--prune")
+	cmd.Dir = repoPath
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git fetch failed: %s: %w", string(output), err)
+	}
+	return nil
+}
+
+// ResolveRef returns the commit SHA for a ref.
+func ResolveRef(repoPath, ref string) (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--verify", ref+"^{commit}")
+	cmd.Dir = repoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve ref %s: %s: %w", ref, string(output), err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+// IsBareRepo reports whether the repository is bare.
+func IsBareRepo(repoPath string) bool {
+	cmd := exec.Command("git", "rev-parse", "--is-bare-repository")
+	cmd.Dir = repoPath
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(output)) == "true"
 }
 
 // AddWorktree creates a new worktree at path with the given branch, based on base.
@@ -174,6 +217,10 @@ func DeleteBranch(repoPath, branch string) error {
 
 // SquashMerge performs a squash merge of sourceBranch into targetBranch with a commit message.
 func SquashMerge(repoPath, targetBranch, sourceBranch, commitMsg string) error {
+	if IsBareRepo(repoPath) {
+		return squashMergeBare(repoPath, targetBranch, sourceBranch, commitMsg)
+	}
+
 	// 1. Checkout target branch
 	cmd := exec.Command("git", "checkout", targetBranch)
 	cmd.Dir = repoPath
@@ -191,6 +238,34 @@ func SquashMerge(repoPath, targetBranch, sourceBranch, commitMsg string) error {
 	// 3. Commit
 	cmd = exec.Command("git", "commit", "-m", commitMsg)
 	cmd.Dir = repoPath
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git commit failed: %s: %w", string(output), err)
+	}
+
+	return nil
+}
+
+func squashMergeBare(repoPath, targetBranch, sourceBranch, commitMsg string) error {
+	tempRoot, err := os.MkdirTemp("", "orion-squash-merge-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp dir for squash merge: %w", err)
+	}
+	defer os.RemoveAll(tempRoot)
+
+	worktreePath := filepath.Join(tempRoot, "merge-worktree")
+	if err := AddWorktree(repoPath, worktreePath, targetBranch, targetBranch); err != nil {
+		return fmt.Errorf("failed to create merge worktree: %w", err)
+	}
+	defer RemoveWorktree(repoPath, worktreePath)
+
+	cmd := exec.Command("git", "merge", "--squash", sourceBranch)
+	cmd.Dir = worktreePath
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git merge --squash %s failed: %s: %w", sourceBranch, string(output), err)
+	}
+
+	cmd = exec.Command("git", "commit", "-m", commitMsg)
+	cmd.Dir = worktreePath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git commit failed: %s: %w", string(output), err)
 	}

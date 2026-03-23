@@ -6,10 +6,10 @@ import "time"
 type NodeStatus string
 
 const (
-	StatusWorking      NodeStatus = "WORKING"       // Initial state after spawn
-	StatusReadyToPush  NodeStatus = "READY_TO_PUSH" // Workflow succeeded, ready to push
-	StatusFail         NodeStatus = "FAIL"          // Workflow failed
-	StatusPushed       NodeStatus = "PUSHED"        // Successfully pushed to remote
+	StatusWorking     NodeStatus = "WORKING"       // Initial state after spawn
+	StatusReadyToPush NodeStatus = "READY_TO_PUSH" // Workflow succeeded, ready to push
+	StatusFail        NodeStatus = "FAIL"          // Workflow failed
+	StatusPushed      NodeStatus = "PUSHED"        // Successfully pushed to remote
 )
 
 // Node represents a development unit in Orion.
@@ -18,6 +18,9 @@ type Node struct {
 	Name          string     `json:"name"`
 	LogicalBranch string     `json:"logical_branch"`         // The user-facing branch (e.g. feature/login)
 	BaseBranch    string     `json:"base_branch,omitempty"`  // The base branch (e.g. main)
+	BaseRef       string     `json:"base_ref,omitempty"`     // The ref used when creating the node (e.g. origin/main)
+	BaseCommit    string     `json:"base_commit,omitempty"`  // The resolved commit SHA for BaseRef at creation time
+	HeadBranch    string     `json:"head_branch,omitempty"`  // The branch checked out in this node's worktree
 	ShadowBranch  string     `json:"shadow_branch"`          // The actual branch for this node (e.g. orion/login-test/feature/login)
 	WorktreePath  string     `json:"worktree_path"`          // Absolute path to the worktree
 	TmuxSession   string     `json:"tmux_session,omitempty"` // Tmux session name, empty if not running

@@ -6,8 +6,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"orion/internal/types"
 	"orion/internal/tmux"
+	"orion/internal/types"
 	"orion/internal/workflow"
 	"orion/internal/workspace"
 
@@ -66,6 +66,9 @@ var inspectCmd = &cobra.Command{
 		fmt.Printf("  Name:           %s\n", node.Name)
 		fmt.Printf("  Logical Branch: %s\n", node.LogicalBranch)
 		fmt.Printf("  Base Branch:    %s\n", node.BaseBranch)
+		fmt.Printf("  Base Ref:       %s\n", node.BaseRef)
+		fmt.Printf("  Base Commit:    %s\n", node.BaseCommit)
+		fmt.Printf("  Head Branch:    %s\n", node.HeadBranch)
 		fmt.Printf("  Worktree:       %s\n", node.WorktreePath)
 		fmt.Printf("  Created By:     %s\n", node.CreatedBy)
 		fmt.Printf("  Label:          %s\n", node.Label)
@@ -125,7 +128,7 @@ var inspectCmd = &cobra.Command{
 
 		fmt.Println("\n💡 Actions")
 		fmt.Printf("  To enter this node: orion enter %s\n", nodeName)
-		
+
 		// Show push hint if node is ready to push
 		if node.Status == types.StatusReadyToPush {
 			fmt.Printf("  To push branch:     orion push %s\n", nodeName)

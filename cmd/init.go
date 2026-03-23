@@ -88,8 +88,8 @@ Clones the repository into a 'repo' subdirectory and sets up configuration.`,
 		}
 
 		// 3. Clone the repository
-		fmt.Println("Cloning repository...")
-		if err := git.Clone(repoURL, wm.State.RepoPath); err != nil {
+		fmt.Println("Cloning bare repository...")
+		if err := git.CloneBare(repoURL, wm.State.RepoPath); err != nil {
 			fmt.Printf("Failed to clone repository: %v\n", err)
 			// Cleanup could be added here
 			os.Exit(1)
@@ -107,14 +107,14 @@ Clones the repository into a 'repo' subdirectory and sets up configuration.`,
 
 func preInstallReleaseWorkflow(workspacePath, provider string) error {
 	orionDir := filepath.Join(workspacePath, ".orion")
-	
+
 	// Create required directories
 	dirs := []string{
 		filepath.Join(orionDir, "workflows"),
 		filepath.Join(orionDir, "agents"),
 		filepath.Join(orionDir, "prompts"),
 	}
-	
+
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %v", dir, err)

@@ -44,11 +44,11 @@ func setupTestWorkspace(t *testing.T) (*WorkspaceManager, func()) {
 		t.Fatalf("Init failed: %v", err)
 	}
 
-	// 4. Manually clone the repo (simulating CLI behavior)
-	if err := git.Clone(remoteDir, wm.State.RepoPath); err != nil {
+	// 4. Manually clone the repo as bare (simulating CLI behavior)
+	if err := git.CloneBare(remoteDir, wm.State.RepoPath); err != nil {
 		os.RemoveAll(rootDir)
 		os.RemoveAll(remoteDir)
-		t.Fatalf("Clone failed: %v", err)
+		t.Fatalf("CloneBare failed: %v", err)
 	}
 
 	// Configure user for local repo as well
@@ -119,6 +119,15 @@ func TestSpawnAndRemoveNode(t *testing.T) {
 	if !exists {
 		t.Errorf("Node not found in state")
 	}
+	if node.BaseRef == "" {
+		t.Errorf("expected BaseRef to be recorded")
+	}
+	if node.BaseCommit == "" {
+		t.Errorf("expected BaseCommit to be recorded")
+	}
+	if node.HeadBranch == "" {
+		t.Errorf("expected HeadBranch to be recorded")
+	}
 
 	// Verify worktree exists
 	if _, err := os.Stat(node.WorktreePath); os.IsNotExist(err) {
@@ -175,19 +184,13 @@ func TestMergeNode(t *testing.T) {
 		t.Fatalf("MergeNode failed: %v", err)
 	}
 
-	// 4. Verify changes in Logical Branch (in the main repo)
-	// We need to check if logicalBranch has the commit.
-	// Note: SquashMerge happens in wm.State.RepoPath.
-	// But wait, SquashMerge checks out logicalBranch in RepoPath.
-
-	// Let's verify file exists in RepoPath (after checkout logicalBranch)
-	// VerifyBranch checks out? No, VerifyBranch just checks existence.
-	// SquashMerge does checkout. So RepoPath should be on logicalBranch now.
-
-	// Check if file exists in main repo
-	repoFile := filepath.Join(wm.State.RepoPath, "new-feature.txt")
-	if _, err := os.Stat(repoFile); os.IsNotExist(err) {
-		t.Errorf("Merged file not found in main repo")
+	// 4. Verify changes in logicalBranch via bare repo object lookup.
+	out, err := exec.Command("git", "-C", wm.State.RepoPath, "show", logicalBranch+":new-feature.txt").CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to inspect merged file from bare repo: %v, output: %s", err, string(out))
+	}
+	if string(out) != "content" {
+		t.Errorf("unexpected merged file content: got %q, want %q", string(out), "content")
 	}
 }
 

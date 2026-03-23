@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"orion/internal/git"
 	"orion/internal/tmux"
 	"orion/internal/types"
 	"orion/internal/workspace"
@@ -51,6 +52,21 @@ var lsCmd = &cobra.Command{
 	},
 }
 
+func formatBaseSyncStatus(repoPath string, node types.Node) string {
+	if node.BaseRef == "" || node.BaseCommit == "" {
+		return "-"
+	}
+
+	currentCommit, err := git.ResolveRef(repoPath, node.BaseRef)
+	if err != nil {
+		return color.RedString("UNKNOWN")
+	}
+	if currentCommit == node.BaseCommit {
+		return color.GreenString("SYNCED")
+	}
+	return color.YellowString("STALE")
+}
+
 func init() {
 	lsCmd.Flags().BoolP("all", "a", false, "Show all nodes (including agent nodes)")
 	lsCmd.Flags().BoolP("quiet", "q", false, "Only output node names (for piping)")
@@ -90,10 +106,11 @@ func sortedNodeNames(nodes map[string]types.Node, showAll bool) []string {
 
 func renderNodeCard(name string, node types.Node) string {
 	sessionStatus := nodeSessionStatus(name)
-	return renderNodeCardWithSession(name, node, sessionStatus)
+	baseStatus := formatBaseSyncStatus(node)
+	return renderNodeCardWithSession(name, node, sessionStatus, baseStatus)
 }
 
-func renderNodeCardWithSession(name string, node types.Node, sessionStatus string) string {
+func renderNodeCardWithSession(name string, node types.Node, sessionStatus string, baseStatus string) string {
 	statusStr := string(node.Status)
 	if node.Status == "" {
 		statusStr = string(types.StatusWorking)
@@ -107,6 +124,7 @@ func renderNodeCardWithSession(name string, node types.Node, sessionStatus strin
 	lines := []string{
 		fmt.Sprintf("%s  %s", color.CyanString(name), formatStatus(statusStr)),
 		fmt.Sprintf("  branch   %s", node.LogicalBranch),
+		fmt.Sprintf("  base     %s", baseStatus),
 		fmt.Sprintf("  label    %s", label),
 		fmt.Sprintf("  session  %s", formatSessionStatus(sessionStatus)),
 		fmt.Sprintf("  created  %s", node.CreatedAt.Format("2006-01-02 15:04")),

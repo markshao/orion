@@ -44,11 +44,12 @@ func TestRenderNodeCardIncludesStableFields(t *testing.T) {
 		CreatedAt:     time.Date(2026, 3, 23, 9, 52, 0, 0, time.UTC),
 	}
 
-	got := renderNodeCardWithSession("bare-repo-dev", node, "STOPPED")
+	got := renderNodeCardWithSession("bare-repo-dev", node, "STOPPED", "-")
 
 	expectedSnippets := []string{
 		"bare-repo-dev  WORKING",
 		"  branch   feature/bare-repo-concept",
+		"  base     -",
 		"  label    -",
 		"  session  STOPPED",
 		"  created  2026-03-23 09:52",
@@ -61,7 +62,7 @@ func TestRenderNodeCardIncludesStableFields(t *testing.T) {
 }
 
 func TestRenderNodeListEmpty(t *testing.T) {
-	got := renderNodeList(map[string]types.Node{}, false)
+	got := renderNodeList("", map[string]types.Node{}, false)
 	if got != "No nodes found.\n" {
 		t.Fatalf("unexpected empty output: %q", got)
 	}

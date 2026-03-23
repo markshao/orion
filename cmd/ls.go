@@ -48,7 +48,7 @@ var lsCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Print(renderNodeList(wm.State.Nodes, showAll))
+		fmt.Print(renderNodeList(wm.State.RepoPath, wm.State.Nodes, showAll))
 	},
 }
 
@@ -73,7 +73,7 @@ func init() {
 	rootCmd.AddCommand(lsCmd)
 }
 
-func renderNodeList(nodes map[string]types.Node, showAll bool) string {
+func renderNodeList(repoPath string, nodes map[string]types.Node, showAll bool) string {
 	names := sortedNodeNames(nodes, showAll)
 	if len(names) == 0 {
 		return "No nodes found.\n"
@@ -86,7 +86,7 @@ func renderNodeList(nodes map[string]types.Node, showAll bool) string {
 		if i > 0 {
 			b.WriteString("\n")
 		}
-		b.WriteString(renderNodeCard(name, nodes[name]))
+		b.WriteString(renderNodeCard(repoPath, name, nodes[name]))
 	}
 
 	return b.String()
@@ -104,9 +104,9 @@ func sortedNodeNames(nodes map[string]types.Node, showAll bool) []string {
 	return names
 }
 
-func renderNodeCard(name string, node types.Node) string {
+func renderNodeCard(repoPath string, name string, node types.Node) string {
 	sessionStatus := nodeSessionStatus(name)
-	baseStatus := formatBaseSyncStatus(node)
+	baseStatus := formatBaseSyncStatus(repoPath, node)
 	return renderNodeCardWithSession(name, node, sessionStatus, baseStatus)
 }
 

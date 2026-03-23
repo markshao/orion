@@ -1,0 +1,4 @@
+interface:
+  display_name: "Push Remote"
+  short_description: "Commit, rebase onto latest main, test, and push safely"
+  default_prompt: "Use $push-remote to inspect this branch, commit any intended changes, fetch and rebase onto the latest origin/main even if there are no staged changes when integration work may still be needed, run the existing tests, resolve conflicts in favor of the feature branch when needed, and push safely."

@@ -210,6 +210,7 @@ source ~/.bashrc
 - [**Installation Guide**](user-guide/installation.md): Requirements and setup.
 - [**Human Node Guide**](user-guide/human-node.md): Managing your workspace and VSCode integration.
 - [**Agentic Workflow Guide**](user-guide/workflow.md): Configuring workflows, agents, and release automation.
+- [**Orion Skills**](orion-skills/README.md): Reusable agent skills distributed with Orion, including Codex installation examples.
 
 ---
 

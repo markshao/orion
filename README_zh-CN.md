@@ -201,6 +201,7 @@ source ~/.bashrc
 - [**安装指南**](user-guide/installation_zh-CN.md): 环境要求与设置。
 - [**Human Node 指南**](user-guide/human-node_zh-CN.md): 管理工作区与 VSCode 集成。
 - [**Agentic Workflow 指南**](user-guide/workflow_zh-CN.md): 配置 workflows、agents 与发版自动化。
+- [**Orion Skills**](orion-skills/README_zh-CN.md): Orion 随仓库分发的可复用 agent skills，以及面向 Codex 的安装示例。
 
 ---
 

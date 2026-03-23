@@ -22,7 +22,7 @@ type nodeSelectionItem struct {
 }
 
 const (
-	nodeSelectionActiveStyle = "\x1b[97;44m"
+	nodeSelectionActiveStyle = "\x1b[30;43m"
 	ansiClearToEndOfLine     = "\x1b[K"
 	ansiReset                = "\x1b[0m"
 )

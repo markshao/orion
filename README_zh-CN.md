@@ -165,6 +165,18 @@ orion push login-dev
 
 这意味着你可以围绕自己的研发流程，扩展出更多 agentic nodes 和自动化步骤。
 
+#### 7. Bare Repo Git 操作
+
+Orion 会把 Git 数据存放在 `repo.git/`，把可编辑代码放在各个 node worktree 中。不带 `-w` 的 `orion run` 只用于 Git 操作，比如 fetch、打 tag、推 tag：
+
+```bash
+orion run git fetch origin
+orion run git tag v1.0.0
+orion run git push --tags
+```
+
+凡是需要工作树的命令，都应使用 `orion run -w <node>`。
+
 ---
 
 ## ✨ 自动补全

@@ -13,8 +13,10 @@ orion init https://github.com/user/repo.git
 ```
 
 此命令会：
-- 将主仓库克隆到 `main_repo/`。
+- 将仓库以 bare repo 形式克隆到 `repo.git/`。
 - 创建 `.orion/` 配置目录。
+
+Orion 只在各个 node worktree 中保留可编辑代码；bare repo 负责存放 refs、objects、tags 和远端状态。
 
 ## 2. 创建 Human Node
 
@@ -82,7 +84,25 @@ orion push login-node
 
 `release-workflow` 会在 shadow branch 上创建 agentic nodes，帮助你完成 rebase 和冲突处理，然后再进入 push 阶段。
 
-## 6. 清理
+## 6. Bare Repo 操作
+
+不带 `-w` 的 `orion run` 只用于在 bare repo 上执行 Git 操作，尤其适合 release/tag 场景：
+
+```bash
+orion run git fetch origin
+orion run git tag v1.0.0
+orion run git push origin v1.0.0
+orion run git push --tags
+```
+
+凡是需要工作树的命令，都要显式指定 node：
+
+```bash
+orion run -w login-node go test ./...
+orion run -w login-node make build
+```
+
+## 7. 清理
 
 当你完成任务后：
 

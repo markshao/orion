@@ -172,6 +172,18 @@ You are not limited to the built-in release workflow. Orion can be extended thro
 
 That lets you define your own agentic nodes and automation steps beyond rebasing and conflict resolution.
 
+#### 7. Bare Repo Git Operations
+
+Orion keeps a bare Git store at `repo.git/` and editable code in node worktrees. Use `orion run` without `-w` for Git-only operations such as fetch, tagging, and pushing tags:
+
+```bash
+orion run git fetch origin
+orion run git tag v1.0.0
+orion run git push --tags
+```
+
+Use `orion run -w <node>` for commands that require a working tree.
+
 ---
 
 ## ✨ Autocompletion

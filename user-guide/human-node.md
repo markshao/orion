@@ -13,8 +13,10 @@ orion init https://github.com/user/repo.git
 ```
 
 This command:
-- Clones the main repository into `main_repo/`.
+- Clones the repository as a bare Git store in `repo.git/`.
 - Creates `.orion/` configuration directory.
+
+Orion keeps editable code only in node worktrees. The bare repo stores refs, objects, tags, and remote state.
 
 ## 2. Create a Human Node
 
@@ -82,7 +84,25 @@ orion push login-node
 
 The `release-workflow` creates agentic nodes on shadow branches to help with rebase and conflict resolution before the branch is pushed.
 
-## 6. Cleaning Up
+## 6. Bare Repo Operations
+
+Use `orion run` without `-w` for Git-only operations against the bare repo, especially release tasks:
+
+```bash
+orion run git fetch origin
+orion run git tag v1.0.0
+orion run git push origin v1.0.0
+orion run git push --tags
+```
+
+Use `orion run -w <node>` for commands that need a working tree:
+
+```bash
+orion run -w login-node go test ./...
+orion run -w login-node make build
+```
+
+## 7. Cleaning Up
 
 When you are done with a task:
 

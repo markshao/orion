@@ -19,6 +19,10 @@ var (
 	runWorktree string
 )
 
+func isGitCommand(args []string) bool {
+	return len(args) > 0 && args[0] == "git"
+}
+
 // isSubDir checks if child is a subdirectory of parent (or the same directory)
 func isSubDir(parent, child string) bool {
 	// Resolve symlinks
@@ -67,7 +71,7 @@ func determineExecDir(wm *workspace.WorkspaceManager, cwd string, targetWorktree
 
 // shellQuote quotes a string for use as a shell argument.
 // It wraps the string in single quotes and escapes any existing single quotes.
-// Example: abc -> 'abc', ab'c -> 'ab'\''c'
+// Example: abc -> 'abc', ab'c -> 'ab'\”c'
 func shellQuote(s string) string {
 	if s == "" {
 		return "''"
@@ -78,21 +82,19 @@ func shellQuote(s string) string {
 // runCmd represents the run command
 var runCmd = &cobra.Command{
 	Use:   "run <command> [args...]",
-	Short: "Execute commands in the main_repo or specified worktree context",
-	Long: `Execute arbitrary commands in the main_repo or specified worktree context.
+	Short: "Execute git commands in the bare repo or arbitrary commands in a worktree",
+	Long: `Execute commands in the Orion bare repo or a specified worktree context.
 
-By default, commands are executed in the main_repo directory.
-Use the --worktree (-w) flag to specify a node's worktree for execution.
+By default, commands run in the bare repo and only git commands are allowed there.
+Use the --worktree (-w) flag to specify a node's worktree for build, test, or other file-tree commands.
 
 Examples:
-  # Execute git pull in the main repository
-  orion run git pull
-
-  # Execute git fetch origin in the main repository
+  # Execute git fetch in the bare repository
   orion run git fetch origin
 
-  # Execute make build in the main repository
-  orion run make build
+  # Create and push a tag from the bare repository
+  orion run git tag v1.0.0
+  orion run git push origin v1.0.0
 
   # Execute commands in a specific node's worktree
   orion run -w my-node npm test
@@ -132,6 +134,12 @@ Examples:
 			os.Exit(1)
 		}
 
+		if targetWorktree == "" && !isGitCommand(commandArgs) {
+			fmt.Println("Error: bare repo context only supports git commands.")
+			fmt.Println("Use `orion run -w <node> ...` to run build, test, or other worktree commands.")
+			os.Exit(1)
+		}
+
 		// 找到 workspace root
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -167,7 +175,7 @@ Examples:
 		}
 
 		// Ensure our print appears before the command output by printing and flushing stdout
-		contextName := "main_repo"
+		contextName := "repo.git"
 		if worktreeName != "" {
 			contextName = worktreeName
 		}
@@ -230,8 +238,7 @@ func init() {
 	runCmd.Flags().StringVarP(&runWorktree, "worktree", "w", "", "Specify which node's worktree to execute the command in")
 }
 
-// GetRunWorktreePath 是一个辅助函数，用于获取 run 命令的执行目录
-// 主要用于测试
+// GetRunWorktreePath returns the directory used by `orion run`.
 func GetRunWorktreePath(rootPath, worktreeName string) (string, error) {
 	wm, err := workspace.NewManager(rootPath)
 	if err != nil {
@@ -250,8 +257,7 @@ func GetRunWorktreePath(rootPath, worktreeName string) (string, error) {
 	return node.WorktreePath, nil
 }
 
-// ExecuteInWorktree 在指定 worktree 中执行命令，返回输出
-// 主要用于测试
+// ExecuteInWorktree executes a command in the bare repo or a specified worktree.
 func ExecuteInWorktree(rootPath, worktreeName string, args []string) (string, int, error) {
 	var execDir string
 	var err error
@@ -270,6 +276,9 @@ func ExecuteInWorktree(rootPath, worktreeName string, args []string) (string, in
 
 	if len(args) == 0 {
 		return "", -1, fmt.Errorf("no command specified")
+	}
+	if worktreeName == "" && !isGitCommand(args) {
+		return "Error: bare repo context only supports git commands.\nUse `orion run -w <node> ...` to run build, test, or other worktree commands.\n", 1, nil
 	}
 
 	command := exec.Command(args[0], args[1:]...)

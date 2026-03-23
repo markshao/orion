@@ -13,6 +13,11 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
+type nodeSelectionItem struct {
+	Name  string
+	Label string
+}
+
 // SelectNode prompts the user to select a node from the active nodes in the workspace.
 // Returns the selected node name or an empty string if cancelled/failed.
 func SelectNode(wm *workspace.WorkspaceManager, action string, onlyHuman bool) (string, error) {
@@ -44,28 +49,7 @@ func SelectNodeWithFilter(wm *workspace.WorkspaceManager, action string, filter 
 	}
 
 	sort.Strings(nodeNames)
-
-	var items []string
-	for _, name := range nodeNames {
-		node := wm.State.Nodes[name]
-		label := strings.TrimSpace(node.Label)
-		if label == "" {
-			label = "-"
-		}
-
-		branch := node.LogicalBranch
-		if strings.TrimSpace(branch) == "" {
-			branch = "-"
-		}
-
-		// Keep it compact: name | label | branch | status
-		status := string(node.Status)
-		if status == "" {
-			status = string(types.StatusWorking)
-		}
-
-		items = append(items, fmt.Sprintf("%s | %s | %s | %s", name, label, branch, status))
-	}
+	items := buildNodeSelectionItems(wm.State.Nodes, nodeNames)
 
 	prompt := promptui.Select{
 		Label: fmt.Sprintf("Select a node to %s", action),
@@ -73,24 +57,42 @@ func SelectNodeWithFilter(wm *workspace.WorkspaceManager, action string, filter 
 		Size:  10,
 		Templates: &promptui.SelectTemplates{
 			Label:    "{{ . }}?",
-			Active:   "👉 {{ . | cyan }}",
-			Inactive: "   {{ . }}",
-			Selected: fmt.Sprintf("✔ Selected node to %s: {{ . | green }}", action),
+			Active:   "👉 {{ .Name | cyan }} {{ .Label | faint }}",
+			Inactive: "   {{ .Name }} {{ .Label | faint }}",
+			Selected: fmt.Sprintf("✔ Selected node to %s: {{ .Name | green }} {{ .Label | faint }}", action),
 		},
 	}
 
-	_, result, err := prompt.Run()
+	index, _, err := prompt.Run()
 	if err != nil {
 		if err == promptui.ErrInterrupt {
 			os.Exit(0)
 		}
 		return "", err
 	}
-	parts := strings.Split(result, " | ")
-	if len(parts) > 0 && parts[0] != "" {
-		return parts[0], nil
+	if index >= 0 && index < len(items) {
+		return items[index].Name, nil
 	}
-	return result, nil
+	return "", fmt.Errorf("failed to determine selected node")
+}
+
+func buildNodeSelectionItems(nodes map[string]types.Node, nodeNames []string) []nodeSelectionItem {
+	items := make([]nodeSelectionItem, 0, len(nodeNames))
+	for _, name := range nodeNames {
+		items = append(items, nodeSelectionItem{
+			Name:  name,
+			Label: normalizeNodeLabel(nodes[name].Label),
+		})
+	}
+	return items
+}
+
+func normalizeNodeLabel(label string) string {
+	label = strings.TrimSpace(label)
+	if label == "" {
+		return "-"
+	}
+	return label
 }
 
 // SelectWorkflowRun prompts the user to select a workflow run.

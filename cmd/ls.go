@@ -3,10 +3,11 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"text/tabwriter"
+	"sort"
+	"strings"
 
-	"orion/internal/types"
 	"orion/internal/tmux"
+	"orion/internal/types"
 	"orion/internal/workspace"
 
 	"github.com/fatih/color"
@@ -34,7 +35,9 @@ var lsCmd = &cobra.Command{
 
 		// Quiet mode: only output node names, suitable for piping
 		if quiet {
-			for name, node := range wm.State.Nodes {
+			names := sortedNodeNames(wm.State.Nodes, showAll)
+			for _, name := range names {
+				node := wm.State.Nodes[name]
 				// Filter out agent nodes unless --all is specified
 				if !showAll && node.CreatedBy != "user" {
 					continue
@@ -44,42 +47,7 @@ var lsCmd = &cobra.Command{
 			return
 		}
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-		fmt.Fprintln(w, "NODE\tSTATUS\tBRANCH\tLABEL\tSESSION\tCREATED")
-
-		for name, node := range wm.State.Nodes {
-			// Filter out agent nodes unless --all is specified
-			if !showAll && node.CreatedBy != "user" {
-				continue
-			}
-
-			sessionStatus := "STOPPED"
-			sessionName := fmt.Sprintf("orion-%s", name)
-			if tmux.SessionExists(sessionName) {
-				sessionStatus = "RUNNING"
-			}
-
-			label := node.Label
-			if label == "" {
-				label = "-"
-			}
-
-			// Format status with color
-			statusStr := string(node.Status)
-			if node.Status == "" {
-				statusStr = string(types.StatusWorking) // Legacy nodes default to WORKING
-			}
-
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
-				name,
-				formatStatus(statusStr),
-				node.LogicalBranch,
-				label,
-				sessionStatus,
-				node.CreatedAt.Format("2006-01-02 15:04"),
-			)
-		}
-		w.Flush()
+		fmt.Print(renderNodeList(wm.State.Nodes, showAll))
 	},
 }
 
@@ -87,6 +55,72 @@ func init() {
 	lsCmd.Flags().BoolP("all", "a", false, "Show all nodes (including agent nodes)")
 	lsCmd.Flags().BoolP("quiet", "q", false, "Only output node names (for piping)")
 	rootCmd.AddCommand(lsCmd)
+}
+
+func renderNodeList(nodes map[string]types.Node, showAll bool) string {
+	names := sortedNodeNames(nodes, showAll)
+	if len(names) == 0 {
+		return "No nodes found.\n"
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "Nodes (%d)\n\n", len(names))
+
+	for i, name := range names {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(renderNodeCard(name, nodes[name]))
+	}
+
+	return b.String()
+}
+
+func sortedNodeNames(nodes map[string]types.Node, showAll bool) []string {
+	names := make([]string, 0, len(nodes))
+	for name, node := range nodes {
+		if !showAll && node.CreatedBy != "user" {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func renderNodeCard(name string, node types.Node) string {
+	sessionStatus := nodeSessionStatus(name)
+	return renderNodeCardWithSession(name, node, sessionStatus)
+}
+
+func renderNodeCardWithSession(name string, node types.Node, sessionStatus string) string {
+	statusStr := string(node.Status)
+	if node.Status == "" {
+		statusStr = string(types.StatusWorking)
+	}
+
+	label := node.Label
+	if label == "" {
+		label = "-"
+	}
+
+	lines := []string{
+		fmt.Sprintf("%s  %s", color.CyanString(name), formatStatus(statusStr)),
+		fmt.Sprintf("  branch   %s", node.LogicalBranch),
+		fmt.Sprintf("  label    %s", label),
+		fmt.Sprintf("  session  %s", formatSessionStatus(sessionStatus)),
+		fmt.Sprintf("  created  %s", node.CreatedAt.Format("2006-01-02 15:04")),
+	}
+
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func nodeSessionStatus(name string) string {
+	sessionName := fmt.Sprintf("orion-%s", name)
+	if tmux.SessionExists(sessionName) {
+		return "RUNNING"
+	}
+	return "STOPPED"
 }
 
 // formatStatus returns a colored string representation of the node status
@@ -102,5 +136,16 @@ func formatStatus(status string) string {
 		return color.HiBlackString("PUSHED")
 	default:
 		return color.YellowString("WORKING")
+	}
+}
+
+func formatSessionStatus(status string) string {
+	switch status {
+	case "RUNNING":
+		return color.GreenString(status)
+	case "STOPPED":
+		return color.HiBlackString(status)
+	default:
+		return status
 	}
 }

@@ -25,6 +25,9 @@ func TestLoadServiceConfigDefaults(t *testing.T) {
 	if cfg.TailLines != 80 {
 		t.Fatalf("expected default tail lines 80, got %d", cfg.TailLines)
 	}
+	if cfg.SimilarityThreshold != 0.99 {
+		t.Fatalf("expected similarity threshold 0.99, got %f", cfg.SimilarityThreshold)
+	}
 	if !cfg.LLMEnabled {
 		t.Fatalf("expected llm classifier to default to enabled")
 	}
@@ -43,6 +46,7 @@ notifications:
   poll_interval: 7s
   silence_threshold: 33s
   reminder_interval: 9m
+  similarity_threshold: 0.995
   tail_lines: 42
   llm_classifier:
     enabled: false
@@ -66,6 +70,9 @@ notifications:
 	}
 	if got := cfg.ReminderInterval.String(); got != "9m0s" {
 		t.Fatalf("expected reminder interval 9m0s, got %s", got)
+	}
+	if cfg.SimilarityThreshold != 0.995 {
+		t.Fatalf("expected similarity threshold 0.995, got %f", cfg.SimilarityThreshold)
 	}
 	if cfg.TailLines != 42 {
 		t.Fatalf("expected tail lines 42, got %d", cfg.TailLines)

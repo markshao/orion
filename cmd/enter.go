@@ -65,8 +65,10 @@ If not, it will start a new client.`,
 
 		if err := notification.EnsureStarted(wm.RootPath); err != nil {
 			color.Yellow("Warning: Failed to start notification service: %v", err)
-		} else if err := notification.EnsureWatcher(wm.RootPath, nodeName, sessionName); err != nil {
+		} else if err := notification.EnsureWatcher(wm.RootPath, nodeName, wm.State.Nodes[nodeName].Label, sessionName); err != nil {
 			color.Yellow("Warning: Failed to register notification watcher: %v", err)
+		} else if err := notification.AcknowledgeWaitEvent(wm.RootPath, nodeName); err != nil {
+			color.Yellow("Warning: Failed to clear pending wait-input state: %v", err)
 		}
 
 		if err := wm.AttachNodeSession(nodeName); err != nil {

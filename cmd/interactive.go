@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode"
 
+	"orion/internal/notification"
 	"orion/internal/types"
 	"orion/internal/workflow"
 	"orion/internal/workspace"
@@ -15,10 +16,11 @@ import (
 )
 
 type nodeSelectionItem struct {
-	Name       string
-	NameColumn string
-	Label      string
-	Row        string
+	Name        string
+	NameColumn  string
+	Label       string
+	PendingWait bool
+	Row         string
 }
 
 const (
@@ -58,7 +60,11 @@ func SelectNodeWithFilter(wm *workspace.WorkspaceManager, action string, filter 
 	}
 
 	sort.Strings(nodeNames)
-	items := buildNodeSelectionItems(wm.State.Nodes, nodeNames)
+	var pendingWait map[string]bool
+	if action == "enter" {
+		pendingWait = loadPendingWaitEvents(wm.RootPath)
+	}
+	items := buildNodeSelectionItems(wm.State.Nodes, nodeNames, pendingWait)
 
 	prompt := promptui.Select{
 		Label: fmt.Sprintf("Select a node to %s", action),
@@ -85,11 +91,11 @@ func SelectNodeWithFilter(wm *workspace.WorkspaceManager, action string, filter 
 	return "", fmt.Errorf("failed to determine selected node")
 }
 
-func buildNodeSelectionItems(nodes map[string]types.Node, nodeNames []string) []nodeSelectionItem {
+func buildNodeSelectionItems(nodes map[string]types.Node, nodeNames []string, pendingWait map[string]bool) []nodeSelectionItem {
 	maxNameWidth := 0
 	labels := make(map[string]string, len(nodeNames))
 	for _, name := range nodeNames {
-		labels[name] = normalizeNodeLabel(nodes[name].Label)
+		labels[name] = buildNodeSelectionLabel(nodes[name].Label, pendingWait[name])
 		if width := displayWidth(name); width > maxNameWidth {
 			maxNameWidth = width
 		}
@@ -100,21 +106,48 @@ func buildNodeSelectionItems(nodes map[string]types.Node, nodeNames []string) []
 		nameColumn := padDisplayWidth(name, maxNameWidth)
 		label := labels[name]
 		items = append(items, nodeSelectionItem{
-			Name:       name,
-			NameColumn: nameColumn,
-			Label:      label,
-			Row:        fmt.Sprintf("%s  %s", nameColumn, label),
+			Name:        name,
+			NameColumn:  nameColumn,
+			Label:       label,
+			PendingWait: pendingWait[name],
+			Row:         fmt.Sprintf("%s  %s", nameColumn, label),
 		})
 	}
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].PendingWait != items[j].PendingWait {
+			return items[i].PendingWait
+		}
+		return items[i].Name < items[j].Name
+	})
 	return items
 }
 
-func normalizeNodeLabel(label string) string {
+func buildNodeSelectionLabel(label string, pendingWait bool) string {
 	label = strings.TrimSpace(label)
 	if label == "" {
-		return "-"
+		label = "-"
+	}
+	if pendingWait {
+		return fmt.Sprintf("[wait] %s", label)
 	}
 	return label
+}
+
+func normalizeNodeLabel(label string) string {
+	return buildNodeSelectionLabel(label, false)
+}
+
+func loadPendingWaitEvents(rootPath string) map[string]bool {
+	registry, err := notification.ReadRegistry(rootPath)
+	if err != nil {
+		return map[string]bool{}
+	}
+
+	pending := make(map[string]bool, len(registry.Watchers))
+	for nodeName, watcher := range registry.Watchers {
+		pending[nodeName] = watcher.State == notification.StateWaitingInput && watcher.WaitEventID > watcher.AckedWaitEventID
+	}
+	return pending
 }
 
 func padDisplayWidth(s string, width int) string {

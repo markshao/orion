@@ -7,8 +7,9 @@ import (
 )
 
 var lookPath = exec.LookPath
+var sendWatcherNotification = NotifyWatcher
 
-func NotifyWatcher(nodeName, reason string) error {
+func NotifyWatcher(nodeName, label, reason string) error {
 	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("mac notifications are only supported on darwin")
 	}
@@ -18,7 +19,7 @@ func NotifyWatcher(nodeName, reason string) error {
 		body = fmt.Sprintf("Waiting for input: %s", reason)
 	}
 
-	cmd, err := buildNotificationCommand(nodeName, body)
+	cmd, err := buildNotificationCommand(nodeName, label, body)
 	if err != nil {
 		return err
 	}
@@ -29,8 +30,11 @@ func NotifyWatcher(nodeName, reason string) error {
 	return nil
 }
 
-func buildNotificationCommand(nodeName, body string) (*exec.Cmd, error) {
+func buildNotificationCommand(nodeName, label, body string) (*exec.Cmd, error) {
 	subtitle := fmt.Sprintf("Node %s", nodeName)
+	if label != "" {
+		subtitle = fmt.Sprintf("Node %s (%s)", nodeName, label)
+	}
 
 	if _, err := lookPath("terminal-notifier"); err == nil {
 		cmd := exec.Command("terminal-notifier",

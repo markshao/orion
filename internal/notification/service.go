@@ -12,6 +12,17 @@ import (
 	"orion/internal/tmux"
 )
 
+type watcherObservation struct {
+	now              time.Time
+	sessionName      string
+	screen           string
+	screenHash       string
+	normalizedScreen string
+	similarity       float64
+	stable           bool
+	stableFor        time.Duration
+}
+
 func GetServiceStatus(rootPath string) (*ServiceStatus, bool, error) {
 	status, err := ReadStatus(rootPath)
 	if err != nil {
@@ -108,7 +119,7 @@ func Stop(rootPath string) error {
 	return nil
 }
 
-func EnsureWatcher(rootPath, nodeName, sessionName string) error {
+func EnsureWatcher(rootPath, nodeName, label, sessionName string) error {
 	primaryPane, err := tmux.GetPrimaryPane(sessionName)
 	if err != nil {
 		return err
@@ -117,8 +128,10 @@ func EnsureWatcher(rootPath, nodeName, sessionName string) error {
 	return UpdateRegistry(rootPath, func(registry *Registry) error {
 		if watcher, ok := registry.Watchers[nodeName]; ok {
 			if watcher.PaneID != "" && tmux.PaneExists(watcher.PaneID) {
+				watcher.Label = label
 				return nil
 			}
+			watcher.Label = label
 			watcher.SessionName = sessionName
 			watcher.PaneID = primaryPane.PaneID
 			watcher.LastError = ""
@@ -126,12 +139,14 @@ func EnsureWatcher(rootPath, nodeName, sessionName string) error {
 		}
 
 		registry.Watchers[nodeName] = &Watcher{
-			NodeName:     nodeName,
-			SessionName:  sessionName,
-			PaneID:       primaryPane.PaneID,
-			RegisteredAt: time.Now(),
-			State:        StateRunning,
-			LastReason:   "registered",
+			NodeName:       nodeName,
+			Label:          label,
+			SessionName:    sessionName,
+			PaneID:         primaryPane.PaneID,
+			RegisteredAt:   time.Now(),
+			State:          StateRunning,
+			StateEnteredAt: time.Now(),
+			LastReason:     "registered",
 		}
 		return nil
 	})
@@ -140,6 +155,17 @@ func EnsureWatcher(rootPath, nodeName, sessionName string) error {
 func UnregisterWatcher(rootPath, nodeName string) error {
 	return UpdateRegistry(rootPath, func(registry *Registry) error {
 		delete(registry.Watchers, nodeName)
+		return nil
+	})
+}
+
+func AcknowledgeWaitEvent(rootPath, nodeName string) error {
+	return UpdateRegistry(rootPath, func(registry *Registry) error {
+		watcher, ok := registry.Watchers[nodeName]
+		if !ok {
+			return nil
+		}
+		watcher.AckedWaitEventID = watcher.WaitEventID
 		return nil
 	})
 }
@@ -249,20 +275,17 @@ func tick(rootPath string, cfg ServiceConfig, classifier SnapshotClassifier, sta
 
 func evaluateWatcher(watcher *Watcher, cfg ServiceConfig, classifier SnapshotClassifier) {
 	now := time.Now()
-	previousState := watcher.State
 	watcher.LastObservedAt = now
 
 	if watcher.PaneID == "" || !tmux.PaneExists(watcher.PaneID) {
-		watcher.State = StateMissing
-		watcher.LastReason = "pane_missing"
+		transitionWatcherState(watcher, StateMissing, "pane_missing", now)
 		watcher.LastError = "pane is no longer available"
 		return
 	}
 
 	meta, err := tmux.GetPaneMeta(watcher.PaneID)
 	if err != nil {
-		watcher.State = StateUnknown
-		watcher.LastReason = "pane_metadata_error"
+		transitionWatcherState(watcher, StateUnknown, "pane_metadata_error", now)
 		watcher.LastError = err.Error()
 		return
 	}
@@ -272,36 +295,14 @@ func evaluateWatcher(watcher *Watcher, cfg ServiceConfig, classifier SnapshotCla
 		screen, err = tmux.CapturePane(watcher.PaneID, false, cfg.TailLines)
 	}
 	if err != nil {
-		watcher.State = StateUnknown
-		watcher.LastReason = "capture_error"
+		transitionWatcherState(watcher, StateUnknown, "capture_error", now)
 		watcher.LastError = err.Error()
 		return
 	}
 
-	screenHash := hashScreen(screen)
-	if watcher.LastHash == "" || watcher.LastHash != screenHash {
-		watcher.LastHash = screenHash
-		watcher.LastChangeAt = now
-	}
-
-	stableFor := now.Sub(watcher.LastChangeAt)
-	classification := HeuristicClassify(screen, stableFor, cfg.SilenceThreshold)
-	if classification.State == StateQuietCandidate {
-		classification = classifyQuietScreen(watcher, classifier, screen, stableFor)
-	}
-
-	watcher.SessionName = meta.SessionName
-	watcher.State = classification.State
-	watcher.LastReason = classification.Reason
+	observation := buildWatcherObservation(watcher, meta.SessionName, screen, now, cfg.SimilarityThreshold)
+	applyWatcherObservation(watcher, observation, cfg, classifier)
 	watcher.LastError = ""
-
-	if shouldNotify(previousState, watcher, cfg.ReminderInterval) {
-		if err := NotifyWatcher(watcher.NodeName, classification.Reason); err != nil {
-			watcher.LastError = err.Error()
-		} else {
-			watcher.LastNotifyAt = now
-		}
-	}
 }
 
 func classifyQuietScreen(watcher *Watcher, classifier SnapshotClassifier, screen string, stableFor time.Duration) Classification {
@@ -328,7 +329,76 @@ func classifyQuietScreen(watcher *Watcher, classifier SnapshotClassifier, screen
 	return classification
 }
 
-func shouldNotify(previousState string, watcher *Watcher, reminderInterval time.Duration) bool {
+func buildWatcherObservation(watcher *Watcher, sessionName, screen string, now time.Time, similarityThreshold float64) watcherObservation {
+	previousScreen := watcher.LastNormalizedScreen
+	normalizedScreen := normalizeScreen(screen)
+	similarity := screenSimilarity(previousScreen, normalizedScreen)
+	stable := previousScreen != "" && similarity >= similarityThreshold
+
+	if !stable {
+		watcher.StableSince = now
+	}
+	if watcher.StableSince.IsZero() {
+		watcher.StableSince = now
+	}
+
+	watcher.SessionName = sessionName
+	watcher.LastNormalizedScreen = normalizedScreen
+	watcher.LastSimilarity = similarity
+	watcher.LastHash = hashScreen(screen)
+	watcher.LastChangeAt = now
+	if stable {
+		watcher.LastChangeAt = watcher.StableSince
+	}
+
+	return watcherObservation{
+		now:              now,
+		sessionName:      sessionName,
+		screen:           screen,
+		screenHash:       watcher.LastHash,
+		normalizedScreen: normalizedScreen,
+		similarity:       similarity,
+		stable:           stable,
+		stableFor:        now.Sub(watcher.StableSince),
+	}
+}
+
+func applyWatcherObservation(watcher *Watcher, observation watcherObservation, cfg ServiceConfig, classifier SnapshotClassifier) {
+	previousState := watcher.State
+	if !observation.stable {
+		transitionWatcherState(watcher, StateRunning, fmt.Sprintf("screen_changed_similarity=%.4f", observation.similarity), observation.now)
+		return
+	}
+
+	transitionWatcherState(watcher, StateQuietCandidate, fmt.Sprintf("stable_screen_similarity=%.4f", observation.similarity), observation.now)
+	classification := classifyQuietScreen(watcher, classifier, observation.screen, observation.stableFor)
+	transitionWatcherState(watcher, classification.State, classification.Reason, observation.now)
+
+	if shouldNotify(previousState, watcher, cfg.ReminderInterval, observation.now) {
+		if err := sendWatcherNotification(watcher.NodeName, watcher.Label, classification.Reason); err != nil {
+			watcher.LastError = err.Error()
+			return
+		}
+		watcher.LastNotifyAt = observation.now
+		watcher.NotifyCount++
+	}
+}
+
+func transitionWatcherState(watcher *Watcher, nextState, reason string, now time.Time) {
+	if watcher.State != nextState {
+		if nextState == StateWaitingInput && watcher.State != StateWaitingInput {
+			watcher.WaitEventID++
+		}
+		watcher.State = nextState
+		watcher.StateEnteredAt = now
+	}
+	watcher.LastReason = reason
+	if nextState != StateWaitingInput {
+		watcher.NotifyCount = 0
+	}
+}
+
+func shouldNotify(previousState string, watcher *Watcher, reminderInterval time.Duration, now time.Time) bool {
 	if watcher.State != StateWaitingInput {
 		return false
 	}
@@ -338,5 +408,10 @@ func shouldNotify(previousState string, watcher *Watcher, reminderInterval time.
 	if watcher.LastNotifyAt.IsZero() {
 		return true
 	}
-	return time.Since(watcher.LastNotifyAt) >= reminderInterval
+
+	nextReminderAfter := reminderInterval
+	for i := 1; i < watcher.NotifyCount; i++ {
+		nextReminderAfter *= 2
+	}
+	return now.Sub(watcher.LastNotifyAt) >= nextReminderAfter
 }

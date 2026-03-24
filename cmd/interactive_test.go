@@ -20,7 +20,7 @@ func TestBuildNodeSelectionItemsUsesNameAndLabelOnly(t *testing.T) {
 		},
 	}
 
-	got := buildNodeSelectionItems(nodes, []string{"alpha", "beta"})
+	got := buildNodeSelectionItems(nodes, []string{"alpha", "beta"}, map[string]bool{})
 	if len(got) != 2 {
 		t.Fatalf("expected 2 selection items, got %d", len(got))
 	}
@@ -65,6 +65,15 @@ func TestNormalizeNodeLabel(t *testing.T) {
 	}
 }
 
+func TestBuildNodeSelectionLabelPendingWait(t *testing.T) {
+	if got := buildNodeSelectionLabel("review auth flow", true); got != "[wait] review auth flow" {
+		t.Fatalf("unexpected pending wait label: %q", got)
+	}
+	if got := buildNodeSelectionLabel("", true); got != "[wait] -" {
+		t.Fatalf("unexpected pending wait label for empty input: %q", got)
+	}
+}
+
 func TestBuildNodeSelectionItemsAlignsWideCharacterNames(t *testing.T) {
 	nodes := map[string]types.Node{
 		"alpha": {
@@ -75,7 +84,7 @@ func TestBuildNodeSelectionItemsAlignsWideCharacterNames(t *testing.T) {
 		},
 	}
 
-	got := buildNodeSelectionItems(nodes, []string{"alpha", "重构"})
+	got := buildNodeSelectionItems(nodes, []string{"alpha", "重构"}, map[string]bool{})
 	if len(got) != 2 {
 		t.Fatalf("expected 2 selection items, got %d", len(got))
 	}
@@ -85,6 +94,24 @@ func TestBuildNodeSelectionItemsAlignsWideCharacterNames(t *testing.T) {
 			got[0].NameColumn, displayWidth(got[0].NameColumn),
 			got[1].NameColumn, displayWidth(got[1].NameColumn),
 		)
+	}
+}
+
+func TestBuildNodeSelectionItemsPrioritizesPendingWait(t *testing.T) {
+	nodes := map[string]types.Node{
+		"alpha": {Label: "review auth flow"},
+		"beta":  {Label: "fix tests"},
+	}
+
+	got := buildNodeSelectionItems(nodes, []string{"alpha", "beta"}, map[string]bool{"beta": true})
+	if len(got) != 2 {
+		t.Fatalf("expected 2 selection items, got %d", len(got))
+	}
+	if got[0].Name != "beta" || !got[0].PendingWait {
+		t.Fatalf("expected pending wait node first, got %#v", got[0])
+	}
+	if got[0].Label != "[wait] fix tests" {
+		t.Fatalf("unexpected pending wait row label: %q", got[0].Label)
 	}
 }
 

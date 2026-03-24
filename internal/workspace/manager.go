@@ -161,6 +161,7 @@ notifications:
   poll_interval: 5s
   silence_threshold: 20s
   reminder_interval: 5m
+  similarity_threshold: 0.99
   tail_lines: 80
   llm_classifier:
     enabled: true

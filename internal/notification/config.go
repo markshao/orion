@@ -13,12 +13,13 @@ import (
 
 func defaultServiceConfig() ServiceConfig {
 	return ServiceConfig{
-		Enabled:          true,
-		PollInterval:     5 * time.Second,
-		SilenceThreshold: 20 * time.Second,
-		ReminderInterval: 5 * time.Minute,
-		TailLines:        80,
-		LLMEnabled:       true,
+		Enabled:             true,
+		PollInterval:        5 * time.Second,
+		SilenceThreshold:    20 * time.Second,
+		ReminderInterval:    5 * time.Minute,
+		SimilarityThreshold: 0.99,
+		TailLines:           80,
+		LLMEnabled:          true,
 	}
 }
 
@@ -76,6 +77,9 @@ func LoadServiceConfig(rootPath string) (ServiceConfig, error) {
 			return ServiceConfig{}, fmt.Errorf("invalid notifications.reminder_interval: %w", err)
 		}
 		cfg.ReminderInterval = d
+	}
+	if workspaceCfg.Notifications.SimilarityThreshold > 0 {
+		cfg.SimilarityThreshold = workspaceCfg.Notifications.SimilarityThreshold
 	}
 	if workspaceCfg.Notifications.TailLines > 0 {
 		cfg.TailLines = workspaceCfg.Notifications.TailLines

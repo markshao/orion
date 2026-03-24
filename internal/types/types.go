@@ -68,12 +68,13 @@ type RuntimeConfig struct {
 }
 
 type NotificationsConfig struct {
-	Enabled          bool                            `yaml:"enabled"`
-	PollInterval     string                          `yaml:"poll_interval"`
-	SilenceThreshold string                          `yaml:"silence_threshold"`
-	ReminderInterval string                          `yaml:"reminder_interval"`
-	TailLines        int                             `yaml:"tail_lines"`
-	LLMClassifier    NotificationLLMClassifierConfig `yaml:"llm_classifier"`
+	Enabled             bool                            `yaml:"enabled"`
+	PollInterval        string                          `yaml:"poll_interval"`
+	SilenceThreshold    string                          `yaml:"silence_threshold"`
+	ReminderInterval    string                          `yaml:"reminder_interval"`
+	SimilarityThreshold float64                         `yaml:"similarity_threshold"`
+	TailLines           int                             `yaml:"tail_lines"`
+	LLMClassifier       NotificationLLMClassifierConfig `yaml:"llm_classifier"`
 }
 
 type NotificationLLMClassifierConfig struct {

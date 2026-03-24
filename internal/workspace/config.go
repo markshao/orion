@@ -23,11 +23,12 @@ func (wm *WorkspaceManager) GetConfig() (*types.Config, error) {
 					DefaultProvider: "qwen",
 				},
 				Notifications: types.NotificationsConfig{
-					Enabled:          true,
-					PollInterval:     "5s",
-					SilenceThreshold: "20s",
-					ReminderInterval: "5m",
-					TailLines:        80,
+					Enabled:             true,
+					PollInterval:        "5s",
+					SilenceThreshold:    "20s",
+					ReminderInterval:    "5m",
+					SimilarityThreshold: 0.99,
+					TailLines:           80,
 					LLMClassifier: types.NotificationLLMClassifierConfig{
 						Enabled: true,
 					},

@@ -279,13 +279,19 @@ func evaluateWatcher(watcher *Watcher, cfg ServiceConfig, classifier SnapshotCla
 	}
 
 	screenHash := hashScreen(screen)
+	normalizedScreen := normalizeScreen(screen)
+	previousScreen := watcher.LastNormalizedScreen
+	watcher.LastNormalizedScreen = normalizedScreen
+	watcher.LastSimilarity = screenSimilarity(previousScreen, normalizedScreen)
 	if watcher.LastHash == "" || watcher.LastHash != screenHash {
 		watcher.LastHash = screenHash
+	}
+	if previousScreen == "" || watcher.LastSimilarity < cfg.SimilarityThreshold {
 		watcher.LastChangeAt = now
 	}
 
 	stableFor := now.Sub(watcher.LastChangeAt)
-	classification := HeuristicClassify(screen, stableFor, cfg.SilenceThreshold)
+	classification := HeuristicClassify(previousScreen, normalizedScreen, cfg.SimilarityThreshold)
 	if classification.State == StateQuietCandidate {
 		classification = classifyQuietScreen(watcher, classifier, screen, stableFor)
 	}

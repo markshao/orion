@@ -11,12 +11,10 @@ func TestBuildNodeSelectionItemsUsesNameAndLabelOnly(t *testing.T) {
 		"alpha": {
 			Label:         "review auth flow",
 			LogicalBranch: "feature/auth",
-			Status:        types.StatusReadyToPush,
 		},
 		"beta": {
 			Label:         "",
 			LogicalBranch: "feature/billing",
-			Status:        types.StatusFail,
 		},
 	}
 

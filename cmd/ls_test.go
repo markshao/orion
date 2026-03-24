@@ -44,11 +44,11 @@ func TestRenderNodeCardIncludesStableFields(t *testing.T) {
 		CreatedAt:     time.Date(2026, 3, 23, 9, 52, 0, 0, time.UTC),
 	}
 
-	got := renderNodeCardContent("bare-repo-dev", node, "-")
+	got := renderNodeCardContent("bare-repo-dev", node, "CLEAN, SYNCED", "-")
 
 	expectedSnippets := []string{
 		"bare-repo-dev",
-		"  git       WORKING",
+		"  git       CLEAN, SYNCED",
 		"  branch    feature/bare-repo-concept",
 		"  base-sync -",
 		"  label     -",

@@ -2,33 +2,22 @@ package types
 
 import "time"
 
-// NodeStatus represents the current state of a node
-type NodeStatus string
-
-const (
-	StatusWorking     NodeStatus = "WORKING"       // Initial state after spawn
-	StatusReadyToPush NodeStatus = "READY_TO_PUSH" // Workflow succeeded, ready to push
-	StatusFail        NodeStatus = "FAIL"          // Workflow failed
-	StatusPushed      NodeStatus = "PUSHED"        // Successfully pushed to remote
-)
-
 // Node represents a development unit in Orion.
 // A Node can exist without a Tmux session (e.g. just created, or session killed).
 type Node struct {
-	Name          string     `json:"name"`
-	LogicalBranch string     `json:"logical_branch"`         // The user-facing branch (e.g. feature/login)
-	BaseBranch    string     `json:"base_branch,omitempty"`  // The base branch (e.g. main)
-	BaseRef       string     `json:"base_ref,omitempty"`     // The ref used when creating the node (e.g. origin/main)
-	BaseCommit    string     `json:"base_commit,omitempty"`  // The resolved commit SHA for BaseRef at creation time
-	HeadBranch    string     `json:"head_branch,omitempty"`  // The branch checked out in this node's worktree
-	ShadowBranch  string     `json:"shadow_branch"`          // The actual branch for this node (e.g. orion/login-test/feature/login)
-	WorktreePath  string     `json:"worktree_path"`          // Absolute path to the worktree
-	TmuxSession   string     `json:"tmux_session,omitempty"` // Tmux session name, empty if not running
-	Label         string     `json:"label,omitempty"`        // User-defined tag (e.g. "review", "test")
-	CreatedBy     string     `json:"created_by,omitempty"`   // "user" for human, or <run-id> for workflow
-	AppliedRuns   []string   `json:"applied_runs,omitempty"` // List of workflow run IDs applied to this node
-	Status        NodeStatus `json:"status,omitempty"`       // Current status of the node
-	CreatedAt     time.Time  `json:"created_at"`
+	Name          string    `json:"name"`
+	LogicalBranch string    `json:"logical_branch"`         // The user-facing branch (e.g. feature/login)
+	BaseBranch    string    `json:"base_branch,omitempty"`  // The base branch (e.g. main)
+	BaseRef       string    `json:"base_ref,omitempty"`     // The ref used when creating the node (e.g. origin/main)
+	BaseCommit    string    `json:"base_commit,omitempty"`  // The resolved commit SHA for BaseRef at creation time
+	HeadBranch    string    `json:"head_branch,omitempty"`  // The branch checked out in this node's worktree
+	ShadowBranch  string    `json:"shadow_branch"`          // The actual branch for this node (e.g. orion/login-test/feature/login)
+	WorktreePath  string    `json:"worktree_path"`          // Absolute path to the worktree
+	TmuxSession   string    `json:"tmux_session,omitempty"` // Tmux session name, empty if not running
+	Label         string    `json:"label,omitempty"`        // User-defined tag (e.g. "review", "test")
+	CreatedBy     string    `json:"created_by,omitempty"`   // "user" for human, or <run-id> for workflow
+	AppliedRuns   []string  `json:"applied_runs,omitempty"` // List of workflow run IDs applied to this node
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // State represents the global state of the Orion workspace.

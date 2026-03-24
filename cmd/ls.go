@@ -105,15 +105,40 @@ func sortedNodeNames(nodes map[string]types.Node, showAll bool) []string {
 
 func renderNodeCard(repoPath string, name string, node types.Node) string {
 	baseStatus := formatBaseSyncStatus(repoPath, node)
-	return renderNodeCardContent(name, node, baseStatus)
+	gitStatus := formatGitStatus(node)
+	return renderNodeCardContent(name, node, gitStatus, baseStatus)
 }
 
-func renderNodeCardContent(name string, node types.Node, baseStatus string) string {
-	statusStr := string(node.Status)
-	if node.Status == "" {
-		statusStr = string(types.StatusWorking)
+func formatGitStatus(node types.Node) string {
+	status, err := git.GetWorktreeStatus(node.WorktreePath)
+	if err != nil {
+		return color.RedString("UNKNOWN")
 	}
 
+	parts := make([]string, 0, 2)
+	if status.Dirty {
+		parts = append(parts, color.YellowString("DIRTY"))
+	} else {
+		parts = append(parts, color.GreenString("CLEAN"))
+	}
+
+	switch {
+	case !status.HasUpstream:
+		parts = append(parts, color.HiBlackString("NO_UPSTREAM"))
+	case status.Ahead == 0 && status.Behind == 0:
+		parts = append(parts, color.GreenString("SYNCED"))
+	case status.Ahead > 0 && status.Behind == 0:
+		parts = append(parts, color.YellowString("AHEAD %d", status.Ahead))
+	case status.Ahead == 0 && status.Behind > 0:
+		parts = append(parts, color.RedString("BEHIND %d", status.Behind))
+	default:
+		parts = append(parts, color.RedString("DIVERGED %d/%d", status.Ahead, status.Behind))
+	}
+
+	return strings.Join(parts, ", ")
+}
+
+func renderNodeCardContent(name string, node types.Node, gitStatus string, baseStatus string) string {
 	label := node.Label
 	if label == "" {
 		label = "-"
@@ -121,7 +146,7 @@ func renderNodeCardContent(name string, node types.Node, baseStatus string) stri
 
 	lines := []string{
 		color.CyanString(name),
-		formatNodeField("git", formatStatus(statusStr)),
+		formatNodeField("git", gitStatus),
 		formatNodeField("branch", node.LogicalBranch),
 		formatNodeField("base-sync", baseStatus),
 		formatNodeField("label", label),
@@ -133,20 +158,4 @@ func renderNodeCardContent(name string, node types.Node, baseStatus string) stri
 
 func formatNodeField(label, value string) string {
 	return fmt.Sprintf("  %-9s %s", label, value)
-}
-
-// formatStatus returns a colored string representation of the node status
-func formatStatus(status string) string {
-	switch status {
-	case string(types.StatusWorking):
-		return color.YellowString("WORKING")
-	case string(types.StatusReadyToPush):
-		return color.GreenString("READY_TO_PUSH")
-	case string(types.StatusFail):
-		return color.RedString("FAIL")
-	case string(types.StatusPushed):
-		return color.HiBlackString("PUSHED")
-	default:
-		return color.YellowString("WORKING")
-	}
 }

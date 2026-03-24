@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"orion/internal/git"
-	"orion/internal/types"
 	"orion/internal/workspace"
 
 	"github.com/fatih/color"
@@ -17,21 +16,17 @@ var pushCmd = &cobra.Command{
 	Short: "Push a node's branch to remote repository",
 	Long: `Push a node's shadow branch to the remote repository.
 
-This command can only push nodes with READY_TO_PUSH status.
-After successful push, the node status will be updated to PUSHED.
 This command must be run from the Orion workspace root.
 
 Examples:
   # Push a specific node
   orion push my-feature
 
-  # Select a pushable node interactively
+  # Select a node interactively
   orion push`,
 	Args:              cobra.MaximumNArgs(1),
-	ValidArgsFunction: CompletePushableNodeNames,
+	ValidArgsFunction: CompleteHumanNodeNames,
 	Run: func(cmd *cobra.Command, args []string) {
-		force, _ := cmd.Flags().GetBool("force")
-
 		cwd, err := os.Getwd()
 		if err != nil {
 			color.Red("Error getting current directory: %v", err)
@@ -57,7 +52,6 @@ Examples:
 
 		// Determine target node
 		var targetNodeName string
-		var targetNode types.Node
 
 		if len(args) > 0 {
 			targetNodeName = args[0]
@@ -70,47 +64,15 @@ Examples:
 				color.Red("Node '%s' is not a human node and cannot be pushed with this command", targetNodeName)
 				os.Exit(1)
 			}
-			targetNode = node
 		} else {
-			selectedName, err := SelectNodeWithFilter(wm, "push", func(node types.Node) bool {
-				return node.CreatedBy == "user" && node.Status == types.StatusReadyToPush
-			})
+			selectedName, err := SelectNode(wm, "push", true)
 			if err != nil {
 				color.Yellow("%v", err)
 				return
 			}
 			targetNodeName = selectedName
-			targetNode = wm.State.Nodes[targetNodeName]
 		}
-
-		// Check node status
-		if !force && targetNode.Status != types.StatusReadyToPush {
-			color.Red("Cannot push node '%s': status is '%s' (expected: READY_TO_PUSH)",
-				targetNodeName, targetNode.Status)
-
-			switch targetNode.Status {
-			case types.StatusWorking:
-				fmt.Println("\nThis node hasn't run any workflow yet.")
-				fmt.Printf("Run 'orion workflow run [workflow_name] %s' first.\n", targetNodeName)
-			case types.StatusFail:
-				fmt.Println("\nThe last workflow run on this node failed.")
-				fmt.Println("Please fix the issues and run the workflow again.")
-			case types.StatusPushed:
-				fmt.Println("\nThis node has already been pushed.")
-				fmt.Println("You may need to create a new node or merge this one.")
-			case "":
-				// Legacy node without status, treat as WORKING
-				fmt.Println("\nThis node was created before status tracking was added.")
-				fmt.Printf("Run 'orion workflow run [workflow_name] %s' first.\n", targetNodeName)
-			}
-
-			fmt.Println("\nUse --force to push anyway (not recommended).")
-			os.Exit(1)
-		}
-
-		if force {
-			color.Yellow("⚠️  Force pushing node '%s' (status: %s)", targetNodeName, targetNode.Status)
-		}
+		targetNode := wm.State.Nodes[targetNodeName]
 
 		// Push the branch
 		fmt.Printf("Pushing branch '%s' to remote...\n", targetNode.ShadowBranch)
@@ -120,19 +82,11 @@ Examples:
 			os.Exit(1)
 		}
 
-		// Update node status to PUSHED
-		if err := wm.UpdateNodeStatus(targetNodeName, types.StatusPushed); err != nil {
-			color.Yellow("Warning: Failed to update node status to PUSHED: %v", err)
-		} else {
-			color.Green("✅ Node '%s' status updated to PUSHED", targetNodeName)
-		}
-
 		color.Green("🚀 Successfully pushed '%s' to remote", targetNodeName)
 		fmt.Printf("Branch: %s\n", targetNode.ShadowBranch)
 	},
 }
 
 func init() {
-	pushCmd.Flags().BoolP("force", "f", false, "Force push regardless of node status")
 	rootCmd.AddCommand(pushCmd)
 }

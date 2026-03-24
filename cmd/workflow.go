@@ -29,9 +29,6 @@ var runWorkflowCmd = &cobra.Command{
 	Long: `Trigger a workflow run on a specific node.
 
 The workflow will create agentic nodes to execute the pipeline.
-After completion, the target node's status will be updated based on the result:
-  - SUCCESS: node status becomes READY_TO_PUSH
-  - FAILED:  node status becomes FAIL
 
 Examples:
   # Run default workflow on my-feature node
@@ -112,25 +109,6 @@ Examples:
 		if err != nil {
 			color.Red("Failed to start workflow: %v", err)
 			os.Exit(1)
-		}
-
-		// Update target node status based on workflow result
-		if targetNodeName != "" {
-			if run.Status == workflow.StatusSuccess {
-				err = wm.UpdateNodeStatus(targetNodeName, types.StatusReadyToPush)
-				if err != nil {
-					color.Yellow("Warning: Failed to update node status to READY_TO_PUSH: %v", err)
-				} else {
-					color.Green("✅ Node '%s' status updated to READY_TO_PUSH", targetNodeName)
-				}
-			} else if run.Status == workflow.StatusFailed {
-				err = wm.UpdateNodeStatus(targetNodeName, types.StatusFail)
-				if err != nil {
-					color.Yellow("Warning: Failed to update node status to FAIL: %v", err)
-				} else {
-					color.Yellow("❌ Node '%s' status updated to FAIL", targetNodeName)
-				}
-			}
 		}
 
 		color.Green("🚀 Workflow '%s' completed with status: %s", wfName, run.Status)
@@ -672,7 +650,7 @@ var artifactsCmd = &cobra.Command{
 var lsArtifactsCmd = &cobra.Command{
 	Use:   "ls [run_id]",
 	Short: "List artifacts for a workflow run",
-	Args:              cobra.MaximumNArgs(1),
+	Args:  cobra.MaximumNArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		// Only autocomplete the first argument (run_id)
 		if len(args) > 0 {

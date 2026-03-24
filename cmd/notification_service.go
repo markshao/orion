@@ -119,7 +119,7 @@ var notificationServiceListWatchersCmd = &cobra.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "NODE\tSESSION\tPANE\tSTATE\tLAST CHANGE\tLAST NOTIFY\tREASON")
+		fmt.Fprintln(w, "NODE\tLABEL\tSESSION\tPANE\tSTATE\tPENDING\tLAST CHANGE\tLAST NOTIFY\tNOTIFY COUNT\tREASON")
 		for _, watcher := range registry.Watchers {
 			lastChange := "-"
 			if !watcher.LastChangeAt.IsZero() {
@@ -129,13 +129,24 @@ var notificationServiceListWatchersCmd = &cobra.Command{
 			if !watcher.LastNotifyAt.IsZero() {
 				lastNotify = watcher.LastNotifyAt.Format("01-02 15:04:05")
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			label := watcher.Label
+			if label == "" {
+				label = "-"
+			}
+			pending := "-"
+			if watcher.State == notification.StateWaitingInput && watcher.WaitEventID > watcher.AckedWaitEventID {
+				pending = "wait-input"
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\n",
 				watcher.NodeName,
+				label,
 				watcher.SessionName,
 				watcher.PaneID,
 				watcher.State,
+				pending,
 				lastChange,
 				lastNotify,
+				watcher.NotifyCount,
 				watcher.LastReason,
 			)
 		}

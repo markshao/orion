@@ -23,10 +23,13 @@ type ServiceConfig struct {
 
 type Watcher struct {
 	NodeName             string    `json:"node_name"`
+	Label                string    `json:"label,omitempty"`
 	SessionName          string    `json:"session_name"`
 	PaneID               string    `json:"pane_id"`
 	RegisteredAt         time.Time `json:"registered_at"`
 	State                string    `json:"state"`
+	StateEnteredAt       time.Time `json:"state_entered_at,omitempty"`
+	StableSince          time.Time `json:"stable_since,omitempty"`
 	LastReason           string    `json:"last_reason,omitempty"`
 	LastHash             string    `json:"last_hash,omitempty"`
 	LastNormalizedScreen string    `json:"last_normalized_screen,omitempty"`
@@ -37,7 +40,10 @@ type Watcher struct {
 	LastClassifiedState  string    `json:"last_classified_state,omitempty"`
 	LastClassifiedAt     time.Time `json:"last_classified_at,omitempty"`
 	LastLLMReason        string    `json:"last_llm_reason,omitempty"`
+	WaitEventID          int       `json:"wait_event_id,omitempty"`
+	AckedWaitEventID     int       `json:"acked_wait_event_id,omitempty"`
 	LastNotifyAt         time.Time `json:"last_notify_at,omitempty"`
+	NotifyCount          int       `json:"notify_count,omitempty"`
 	LastError            string    `json:"last_error,omitempty"`
 }
 

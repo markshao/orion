@@ -39,10 +39,8 @@ github-release:
 		echo "Usage: make github-release tag=v1.0.0-alpha.11"; \
 		exit 1; \
 	fi
-	@branch=$$(git rev-parse --abbrev-ref HEAD); \
-	sha=$$(git rev-parse HEAD); \
-	echo "Updating bare repo ref $$branch -> $$sha"; \
-	orion run git update-ref refs/heads/$$branch $$sha; \
+	@sha=$$(git rev-parse HEAD); \
+	orion sync-ref; \
 	echo "Tagging $$sha as $(tag)"; \
 	orion run git tag $(tag) $$sha; \
 	echo "Pushing tag $(tag)"; \

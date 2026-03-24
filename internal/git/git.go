@@ -171,6 +171,17 @@ func Fetch(repoPath string) error {
 	return nil
 }
 
+// FetchWithOutput updates remote-tracking refs in the repository and returns git's output.
+func FetchWithOutput(repoPath string) (string, error) {
+	cmd := exec.Command("git", "fetch", "origin", "--prune")
+	cmd.Dir = repoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), fmt.Errorf("git fetch failed: %s: %w", string(output), err)
+	}
+	return string(output), nil
+}
+
 // ResolveRef returns the commit SHA for a ref.
 func ResolveRef(repoPath, ref string) (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--verify", ref+"^{commit}")
@@ -346,6 +357,16 @@ func PushBranch(repoPath, branch string) error {
 	cmd.Dir = repoPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git push failed: %s: %w", string(output), err)
+	}
+	return nil
+}
+
+// UpdateRef updates a ref in the repository to point at the specified commit.
+func UpdateRef(repoPath, ref, commit string) error {
+	cmd := exec.Command("git", "update-ref", ref, commit)
+	cmd.Dir = repoPath
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git update-ref %s %s failed: %s: %w", ref, commit, string(output), err)
 	}
 	return nil
 }

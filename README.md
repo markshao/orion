@@ -1,236 +1,129 @@
-# <img src="assets/icon.svg" alt="Orion Logo" width="40" height="40" align="top"/> Orion: AI-Native Development Environment Manager
+# <img src="assets/icon.svg" alt="Orion Logo" width="40" height="40" align="top"/> Orion
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 [**English**](README.md) | [**简体中文**](README_zh-CN.md)
 
-**Orion** is a CLI tool for the **Agentic DevOps** era. It virtualizes your local development environment so you can develop in isolated nodes and hand off integration work to AI agents running in parallel worktrees.
+Orion is an AI-native development environment manager for parallel coding agents.
+It combines Git worktrees, tmux sessions, and agent workflows into one local protocol.
 
-## 🌌 Why "Orion"?
+## Why Orion
 
-**Orion** is a navigation system for AI agents. The name symbolizes how **Orion orchestrates agents across your codebase**, guiding them through complex development tasks like the constellation guides a navigator.
+- Parallel and isolated execution: each node has its own worktree, session, and branch context.
+- Agent-first Git model: humans manage goals; agents handle branch-heavy routine operations.
+- Human-as-manager workflow: enter any node at any time to inspect progress and redirect work.
+- Local Agentic DevOps: run integration steps locally with agent pipelines, not only in remote CI.
+- Attention routing: Orion can detect pending input in node sessions and notify you.
+- Official Feishu/Lark support: route waiting-input events to team chat for faster human feedback loops.
 
----
+## Quick Start (5 Minutes)
 
-## 🌟 Core Concept: Agentic DevOps
+This path covers your target loop: create node with AI, code, detach, switch to new work, return on notification, then push safely.
 
-Traditional DevOps relies on remote CI/CD pipelines—slow, stateless, and disconnected from your IDE.
-
-**Orion brings the pipeline to your local machine.** It introduces the concept of **Nodes**:
-
-- **Human Node**: Your dedicated workspace (Git Worktree + Tmux Session).
-- **Agentic Node**: An ephemeral workspace where AI Agents running in the background can write code, run tests, and fix bugs _concurrently_ with you.
-
-### Local Agentic DevOps
-
-Local Agentic DevOps means **bringing CI-like integration work onto your local machine**, with AI agents running as first-class teammates:
-
-- **Human Node**: you create a branch and node, code in an isolated worktree + tmux session, and commit normally.
-- **Release Workflow**: when your feature is ready, you run `release-workflow` on that node.
-- **Agentic Nodes**: workflow steps run in isolated worktrees + tmux sessions on shadow branches.
-- **Ready to Push**: when the workflow succeeds, Orion marks the human node as `READY_TO_PUSH`.
-- **Push**: you publish the validated branch with `orion push`.
-
-### The Recommended Flow
-
-Orion allows you to configure `.orion/workflows/*.yaml` to define how agents interact with your codebase. The recommended built-in path is the **Release Workflow**:
-
-1. Use `orion ai` to generate a branch name and node name from a natural-language task.
-2. Enter the human node and develop normally.
-3. Commit your code on the human node.
-4. Run `orion workflow run release-workflow --node <node-name>`.
-5. Orion creates an isolated agentic node on a shadow branch.
-6. The agent rebases onto the target base branch, resolves conflicts, and prepares the branch for integration.
-7. If the workflow succeeds, the human node status becomes `READY_TO_PUSH`.
-8. Run `orion push <node-name>` to publish the branch.
-
-This lets you offload rebasing and conflict resolution to agents without polluting your main working directory.
-
-<img src="assets/diagrams/local-agentic-devops.png" alt="Local Agentic DevOps diagram" width="900" />
-
-1.  **Create**: Use AI to create a branch and human node.
-2.  **Code**: Work and commit in your Human Node.
-3.  **Delegate**: Run a workflow to let Agent Nodes handle rebase and conflict resolution.
-4.  **Publish**: Push the validated result once the node becomes `READY_TO_PUSH`.
-
----
-
-## 🚀 Quick Start
-
-### Installation
-
-**One-Click Install (Recommended)**
+### 1) Install latest and initialize
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/markshao/orion/main/install.sh | bash
 ```
 
-**Manual Install**
-
-See [Installation Guide](user-guide/installation.md) for building from source.
-
-### Usage
-
-#### 1. Initialize
+Then initialize a workspace:
 
 ```bash
-orion init https://github.com/user/repo.git
+# create a workspace
+orion init https://github.com/<you>/<repo>.git
+cd <repo>_swarm
 ```
 
-#### 2. Create Your Human Node
-
-**Option A: Manual Creation**
+### 2) Let Orion AI create your first human node
 
 ```bash
-# Create a node for your feature
-orion spawn feature/login login-dev
-
-# Enter the isolated environment
-orion enter login-dev
+orion ai "implement login API and session flow"
+orion enter <node-name>
 ```
 
-**Option B: AI-Powered Creation (Recommended)**
-
-Use natural language to let AI generate branch and node names for you:
+Inside tmux, launch your coding agent and start vibe coding:
 
 ```bash
-# Create a node using natural language
-orion ai "implement user login feature"
-
-# Based on a specific branch
-orion ai "fix payment bug based on release/v1.2"
-
-# Skip confirmation with --force flag
-orion ai "refactor authentication module" --force
+codex
+# or
+kimi
 ```
 
-The `orion ai` command will:
-- Analyze your description using LLM (Moonshot/OpenAI-compatible)
-- Auto-generate appropriate branch name (e.g., `feature/user-login`, `fix/payment-bug`)
-- Auto-generate readable node name (e.g., `user-login-dev`, `payment-fix`)
-- Create the worktree and set up the development environment
+Detach from tmux:
 
-**Configuration**
-
-Create `~/.orion.conf` to configure your AI provider:
-
-```yaml
-api_key: "$MOONSHOT_API_KEY"          # Or direct key: "sk-xxx"
-base_url: "https://api.moonshot.cn/v1"
-model: "kimi-k2-turbo-preview"
+```text
+Ctrl+b, then d
 ```
 
-Then enter your development environment:
+### 3) Keep moving: start another feature
 
 ```bash
-orion enter <generated-node-name>
+orion ai "start payment retry feature"
 ```
 
-#### 3. Develop and Commit
-
-After entering the node, develop normally and commit your changes:
+When Orion detects another node is waiting for your input, you'll receive notifications (including Feishu/Lark, if configured). You can also check watcher status:
 
 ```bash
-orion enter login-dev
-git status
-git add .
-git commit -m "feat: implement login flow"
+orion notification-service status
+orion notification-service list-watchers
 ```
 
-#### 4. Run the Release Workflow
-
-When your human-node changes are ready, run the built-in release workflow:
+Jump back to the waiting node:
 
 ```bash
-# Trigger the release workflow on a specific node
-orion workflow run release-workflow --node login-dev
+orion enter <previous-node-name>
+```
 
-# Check workflow status
+### 4) Delegate release workflow and publish
+
+```bash
+orion workflow run release-workflow --node <node-name>
 orion workflow ls
-
-# Inspect what the agent did
-orion workflow inspect <run-id>
+orion inspect <node-name>
 ```
 
-The `release-workflow` uses an agentic node on a shadow branch to help with rebase and conflict handling. When the run succeeds, Orion marks the human node as `READY_TO_PUSH`.
+Then finish commit/rebase/push with the Codex skill:
 
-#### 5. Push the Result
+```text
+/push_remote
+```
+
+`/push_remote` requires the [`push-remote` skill](orion-skills/README.md) to be installed in Codex.
+
+Or use Orion native push directly:
 
 ```bash
-orion inspect login-dev
-orion push login-dev
+orion push <node-name>
 ```
 
-#### 6. Customize Workflows
+## Core Commands
 
-You are not limited to the built-in release workflow. Orion can be extended through:
+| Command | Purpose |
+| --- | --- |
+| `orion init <repo-url>` | Initialize an Orion workspace |
+| `orion ai "<task>"` | Create branch + node from natural language |
+| `orion spawn <branch> <node>` | Manually create a node |
+| `orion enter <node>` | Enter the node tmux session |
+| `orion ls` | List active nodes |
+| `orion inspect <node>` | Show node status and branch details |
+| `orion workflow run <workflow> --node <node>` | Trigger an agent workflow |
+| `orion workflow ls` | List workflow runs |
+| `orion workflow inspect <run-id>` | Inspect workflow details |
+| `orion notification-service status` | Show notification service status |
+| `orion notification-service list-watchers` | Show watcher state and pending input |
+| `orion push <node>` | Push node branch to remote |
 
-- `.orion/workflows/*.yaml` for workflow definitions
-- `.orion/agents/*.yaml` for agent runtime configuration
-- `.orion/prompts/*` for agent prompts and task instructions
+## Learn More
 
-That lets you define your own agentic nodes and automation steps beyond rebasing and conflict resolution.
-
-#### 7. Bare Repo Git Operations
-
-Orion keeps a bare Git store at `repo.git/` and editable code in node worktrees.
-Use `orion run` without `-w` only for Git commands that do not require a working tree, such as fetch, log, tagging, and pushing tags:
-
-```bash
-orion run git fetch origin
-orion run git log --oneline -5
-orion run git tag v1.0.0
-orion run git push --tags
-```
-
-Use `orion run -w <node>` for commands that require a working tree:
-
-```bash
-orion run -w login-dev git status
-orion run -w login-dev git pull
-orion run -w login-dev go test ./...
-orion run -w login-dev make build
-```
-
-Commands like `git status`, `git pull`, `git diff`, and ordinary shell commands such as `ls` must run in a node worktree, not in `repo.git/`.
-
----
-
-## ✨ Autocompletion
-
-The install script attempts to configure autocompletion for Zsh and Bash automatically.
-If you need to set it up manually:
-
-**Zsh**
-
-```bash
-echo "source <(orion completion zsh)" >> ~/.zshrc
-source ~/.zshrc
-```
-
-**Bash**
-
-```bash
-echo "source <(orion completion bash)" >> ~/.bashrc
-source ~/.bashrc
-```
-
-## 📚 Documentation
-
-- [**Installation Guide**](user-guide/installation.md): Requirements and setup.
-- [**Human Node Guide**](user-guide/human-node.md): Managing your workspace and VSCode integration.
-- [**Agentic Workflow Guide**](user-guide/workflow.md): Configuring workflows, agents, and release automation.
-- [**Orion Skills**](orion-skills/README.md): Reusable agent skills distributed with Orion, including Codex installation examples.
-
----
-
-## 🛠 Tech Stack
-
-- **Golang**: Core logic and CLI (Cobra).
-- **Git Worktree**: File system isolation.
-- **Tmux**: Process and session isolation.
-- **Qwen**: The AI engine powering the automation.
+- [Concepts: Human Node, Agentic Node, Shadow Branch](docs/concepts/README.md)
+- [Workflows: Local Agentic DevOps and pipeline config](docs/workflows/README.md)
+- [Notifications: waiting-input detection and alerting](docs/notifications/README.md)
+- [Configuration: LLM, runtime, and workspace settings](docs/configuration/README.md)
+- [Architecture: workspace, git, tmux, workflow engine](docs/architecture/README.md)
+- [Installation Guide](user-guide/installation.md)
+- [Human Node Guide](user-guide/human-node.md)
+- [Orion Skills (`push-remote`)](orion-skills/README.md)
 
 ## License
 

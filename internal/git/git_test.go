@@ -293,7 +293,7 @@ func TestGetWorktreeStatusWithAheadBehindAndDirty(t *testing.T) {
 	}
 	defer os.RemoveAll(clonePath)
 
-	if output, err := exec.Command("git", "clone", remotePath, clonePath).CombinedOutput(); err != nil {
+	if output, err := exec.Command("git", "clone", "--branch", "main", remotePath, clonePath).CombinedOutput(); err != nil {
 		t.Fatalf("failed to clone remote: %v, output: %s", err, output)
 	}
 	_ = exec.Command("git", "-C", clonePath, "config", "user.email", "test@example.com").Run()

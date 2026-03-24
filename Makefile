@@ -1,4 +1,4 @@
-.PHONY: all build local-install install uninstall run clean
+.PHONY: all build local-install install uninstall run clean github-release
 
 APP_NAME := orion
 BUILD_DIR := bin
@@ -33,3 +33,17 @@ run: build
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+github-release:
+	@if [ -z "$(tag)" ]; then \
+		echo "Usage: make github-release tag=v1.0.0-alpha.11"; \
+		exit 1; \
+	fi
+	@branch=$$(git rev-parse --abbrev-ref HEAD); \
+	sha=$$(git rev-parse HEAD); \
+	echo "Updating bare repo ref $$branch -> $$sha"; \
+	orion run git update-ref refs/heads/$$branch $$sha; \
+	echo "Tagging $$sha as $(tag)"; \
+	orion run git tag $(tag) $$sha; \
+	echo "Pushing tag $(tag)"; \
+	orion run git push origin $(tag)

@@ -22,14 +22,14 @@ func CompleteNodeNames(cmd *cobra.Command, args []string, toComplete string) ([]
 	return getNodeNames(nil)
 }
 
-// CompletePushableNodeNames returns human nodes that are ready to push.
-func CompletePushableNodeNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+// CompleteHumanNodeNames returns human-created nodes.
+func CompleteHumanNodeNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	return getNodeNames(func(node types.Node) bool {
-		return node.CreatedBy == "user" && node.Status == types.StatusReadyToPush
+		return node.CreatedBy == "user"
 	})
 }
 

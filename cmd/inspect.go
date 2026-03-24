@@ -6,8 +6,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"orion/internal/git"
 	"orion/internal/tmux"
-	"orion/internal/types"
 	"orion/internal/workflow"
 	"orion/internal/workspace"
 
@@ -74,6 +74,19 @@ var inspectCmd = &cobra.Command{
 		fmt.Printf("  Label:          %s\n", node.Label)
 		fmt.Printf("  Created At:     %s\n", node.CreatedAt.Format(time.RFC3339))
 
+		gitStatus, err := git.GetWorktreeStatus(node.WorktreePath)
+		if err != nil {
+			fmt.Printf("  Git Status:     error: %v\n", err)
+		} else {
+			fmt.Printf("  Git Status:     %s\n", summarizeGitStatus(gitStatus))
+			if gitStatus.HasUpstream {
+				fmt.Printf("  Upstream:       %s\n", gitStatus.Upstream)
+				fmt.Printf("  Ahead/Behind:   %d/%d\n", gitStatus.Ahead, gitStatus.Behind)
+			} else {
+				fmt.Printf("  Upstream:       -\n")
+			}
+		}
+
 		sessionName := fmt.Sprintf("orion-%s", node.Name)
 		sessionStatus := "STOPPED"
 		if tmux.SessionExists(sessionName) {
@@ -128,14 +141,40 @@ var inspectCmd = &cobra.Command{
 
 		fmt.Println("\n💡 Actions")
 		fmt.Printf("  To enter this node: orion enter %s\n", nodeName)
-
-		// Show push hint if node is ready to push
-		if node.Status == types.StatusReadyToPush {
-			fmt.Printf("  To push branch:     orion push %s\n", nodeName)
-		}
+		fmt.Printf("  To push branch:     orion push %s\n", nodeName)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(inspectCmd)
+}
+
+func summarizeGitStatus(status git.WorktreeStatus) string {
+	if status.Dirty {
+		switch {
+		case !status.HasUpstream:
+			return "DIRTY, NO_UPSTREAM"
+		case status.Ahead == 0 && status.Behind == 0:
+			return "DIRTY, SYNCED"
+		case status.Ahead > 0 && status.Behind == 0:
+			return fmt.Sprintf("DIRTY, AHEAD %d", status.Ahead)
+		case status.Ahead == 0 && status.Behind > 0:
+			return fmt.Sprintf("DIRTY, BEHIND %d", status.Behind)
+		default:
+			return fmt.Sprintf("DIRTY, DIVERGED %d/%d", status.Ahead, status.Behind)
+		}
+	}
+
+	switch {
+	case !status.HasUpstream:
+		return "CLEAN, NO_UPSTREAM"
+	case status.Ahead == 0 && status.Behind == 0:
+		return "CLEAN, SYNCED"
+	case status.Ahead > 0 && status.Behind == 0:
+		return fmt.Sprintf("CLEAN, AHEAD %d", status.Ahead)
+	case status.Ahead == 0 && status.Behind > 0:
+		return fmt.Sprintf("CLEAN, BEHIND %d", status.Behind)
+	default:
+		return fmt.Sprintf("CLEAN, DIVERGED %d/%d", status.Ahead, status.Behind)
+	}
 }

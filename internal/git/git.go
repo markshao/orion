@@ -9,6 +9,14 @@ import (
 	"strings"
 )
 
+type WorktreeStatus struct {
+	Dirty       bool
+	HasUpstream bool
+	Upstream    string
+	Ahead       int
+	Behind      int
+}
+
 // MergeWorktree merges sourceBranch into the current branch of the worktree.
 func MergeWorktree(worktreePath, sourceBranch string, squash bool) error {
 	args := []string{"merge", sourceBranch}
@@ -51,6 +59,48 @@ func HasChanges(worktreePath string) (bool, error) {
 		return false, fmt.Errorf("git status failed: %w", err)
 	}
 	return len(bytes.TrimSpace(output)) > 0, nil
+}
+
+// GetWorktreeStatus returns a real-time summary of the worktree's git state.
+func GetWorktreeStatus(worktreePath string) (WorktreeStatus, error) {
+	dirty, err := HasChanges(worktreePath)
+	if err != nil {
+		return WorktreeStatus{}, err
+	}
+
+	status := WorktreeStatus{Dirty: dirty}
+
+	upstreamCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+	upstreamCmd.Dir = worktreePath
+	upstreamOut, err := upstreamCmd.CombinedOutput()
+	if err != nil {
+		// No upstream is a normal case for a local-only branch.
+		return status, nil
+	}
+
+	status.HasUpstream = true
+	status.Upstream = strings.TrimSpace(string(upstreamOut))
+
+	countCmd := exec.Command("git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
+	countCmd.Dir = worktreePath
+	countOut, err := countCmd.CombinedOutput()
+	if err != nil {
+		return WorktreeStatus{}, fmt.Errorf("git rev-list failed: %s: %w", string(countOut), err)
+	}
+
+	fields := strings.Fields(string(countOut))
+	if len(fields) != 2 {
+		return WorktreeStatus{}, fmt.Errorf("unexpected git rev-list output: %q", string(countOut))
+	}
+
+	if _, err := fmt.Sscanf(fields[0], "%d", &status.Ahead); err != nil {
+		return WorktreeStatus{}, fmt.Errorf("failed to parse ahead count %q: %w", fields[0], err)
+	}
+	if _, err := fmt.Sscanf(fields[1], "%d", &status.Behind); err != nil {
+		return WorktreeStatus{}, fmt.Errorf("failed to parse behind count %q: %w", fields[1], err)
+	}
+
+	return status, nil
 }
 
 // GetCurrentBranch returns the current branch name of the repo at path.

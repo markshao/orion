@@ -46,7 +46,7 @@ func TestRunSyncRefUpdatesBareRepoBranch(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	if err := runSyncRef(node.WorktreePath, &stdout, &stderr); err != nil {
+	if err := runSyncRef(node.WorktreePath, &stdout, &stderr, ""); err != nil {
 		t.Fatalf("runSyncRef failed: %v, stderr: %s", err, stderr.String())
 	}
 
@@ -88,7 +88,7 @@ func TestRunSyncRefWarnsForUncommittedChanges(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	if err := runSyncRef(node.WorktreePath, &stdout, &stderr); err != nil {
+	if err := runSyncRef(node.WorktreePath, &stdout, &stderr, ""); err != nil {
 		t.Fatalf("runSyncRef failed: %v, stderr: %s", err, stderr.String())
 	}
 
@@ -97,17 +97,39 @@ func TestRunSyncRefWarnsForUncommittedChanges(t *testing.T) {
 	}
 }
 
-func TestRunSyncRefRequiresNodeWorktree(t *testing.T) {
+func TestRunSyncRefFromWorkspaceRootSyncsMainFromOrigin(t *testing.T) {
 	rootPath, _, cleanup := setupTestWorkspaceForRun(t)
 	defer cleanup()
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := runSyncRef(rootPath, &stdout, &stderr)
-	if err == nil {
-		t.Fatal("expected error when running outside a node worktree")
+	if err := runSyncRef(rootPath, &stdout, &stderr, ""); err != nil {
+		t.Fatalf("runSyncRef failed: %v", err)
 	}
-	if !strings.Contains(err.Error(), "must be run inside a node worktree") {
-		t.Fatalf("unexpected error: %v", err)
+
+	gotMain, cmdErr := exec.Command("git", "-C", filepath.Join(rootPath, "repo.git"), "rev-parse", "refs/heads/main").Output()
+	if cmdErr != nil {
+		t.Fatalf("rev-parse refs/heads/main failed: %v", cmdErr)
+	}
+	if strings.TrimSpace(string(gotMain)) == "" {
+		t.Fatal("refs/heads/main should resolve to a commit")
+	}
+	if !strings.Contains(stdout.String(), "Syncing workspace branch 'main' from origin/main into repo.git") {
+		t.Fatalf("missing workspace sync banner in output: %s", stdout.String())
+	}
+}
+
+func TestRunSyncRefWithBranchFlagWorksOutsideNode(t *testing.T) {
+	rootPath, _, cleanup := setupTestWorkspaceForRun(t)
+	defer cleanup()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := runSyncRef(rootPath, &stdout, &stderr, "main"); err != nil {
+		t.Fatalf("runSyncRef failed with --branch main: %v, stderr: %s", err, stderr.String())
+	}
+
+	if !strings.Contains(stdout.String(), "Syncing workspace branch 'main' from origin/main into repo.git") {
+		t.Fatalf("missing workspace sync banner in output: %s", stdout.String())
 	}
 }

@@ -9,9 +9,6 @@ import (
 func TestLoadServiceConfigDefaults(t *testing.T) {
 	rootDir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
-	if err := os.MkdirAll(filepath.Join(rootDir, ".orion"), 0755); err != nil {
-		t.Fatalf("failed to create .orion dir: %v", err)
-	}
 
 	cfg, err := LoadServiceConfig(rootDir)
 	if err != nil {
@@ -50,15 +47,9 @@ func TestLoadServiceConfigOverrides(t *testing.T) {
 	rootDir := t.TempDir()
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)
-	orionDir := filepath.Join(rootDir, ".orion")
-	if err := os.MkdirAll(orionDir, 0755); err != nil {
-		t.Fatalf("failed to create .orion dir: %v", err)
-	}
-
-	configContent := `version: 1
-notifications:
+	globalContent := `notifications:
   enabled: false
-  provider: macos
+  provider: lark
   poll_interval: 7s
   silence_threshold: 33s
   reminder_interval: 9m
@@ -66,17 +57,26 @@ notifications:
   tail_lines: 42
   llm_classifier:
     enabled: false
+  lark:
+    app_id: app-id
+    app_secret: app-secret
+    base_url: https://open.feishu.cn
+    open_id: ou_xxx
+    urgent_app: false
+    card_title: custom title
 `
-	if err := os.WriteFile(filepath.Join(orionDir, "config.yaml"), []byte(configContent), 0644); err != nil {
-		t.Fatalf("failed to write config: %v", err)
+	if err := os.WriteFile(filepath.Join(homeDir, ".orion.yaml"), []byte(globalContent), 0644); err != nil {
+		t.Fatalf("failed to write global config: %v", err)
 	}
-
 	cfg, err := LoadServiceConfig(rootDir)
 	if err != nil {
-		t.Fatalf("LoadServiceConfig returned error: %v", err)
+		t.Fatalf("LoadServiceConfig returned error after global config: %v", err)
 	}
 	if cfg.Enabled {
 		t.Fatalf("expected notifications to be disabled")
+	}
+	if cfg.Provider != "lark" {
+		t.Fatalf("expected provider lark, got %q", cfg.Provider)
 	}
 	if got := cfg.PollInterval.String(); got != "7s" {
 		t.Fatalf("expected poll interval 7s, got %s", got)
@@ -95,26 +95,6 @@ notifications:
 	}
 	if cfg.LLMEnabled {
 		t.Fatalf("expected llm classifier to be disabled")
-	}
-	globalContent := `notifications:
-  provider: lark
-  lark:
-    app_id: app-id
-    app_secret: app-secret
-    base_url: https://open.feishu.cn
-    open_id: ou_xxx
-    urgent_app: false
-    card_title: custom title
-`
-	if err := os.WriteFile(filepath.Join(homeDir, ".orion.yaml"), []byte(globalContent), 0644); err != nil {
-		t.Fatalf("failed to write global config: %v", err)
-	}
-	cfg, err = LoadServiceConfig(rootDir)
-	if err != nil {
-		t.Fatalf("LoadServiceConfig returned error after global config: %v", err)
-	}
-	if cfg.Provider != "lark" {
-		t.Fatalf("expected provider lark, got %q", cfg.Provider)
 	}
 	if cfg.Lark.AppID != "app-id" {
 		t.Fatalf("expected lark app_id to be loaded")

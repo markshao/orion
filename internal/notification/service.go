@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -21,6 +22,48 @@ type watcherObservation struct {
 	similarity       float64
 	stable           bool
 	stableFor        time.Duration
+}
+
+var serviceLogger struct {
+	mu   sync.Mutex
+	file *os.File
+}
+
+func initServiceLogger(rootPath string) error {
+	serviceLogger.mu.Lock()
+	defer serviceLogger.mu.Unlock()
+
+	if serviceLogger.file != nil {
+		return nil
+	}
+	f, err := os.OpenFile(logPath(rootPath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	serviceLogger.file = f
+	return nil
+}
+
+func closeServiceLogger() {
+	serviceLogger.mu.Lock()
+	defer serviceLogger.mu.Unlock()
+	if serviceLogger.file != nil {
+		_ = serviceLogger.file.Close()
+		serviceLogger.file = nil
+	}
+}
+
+func serviceLogf(format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	line := fmt.Sprintf("[%s] %s\n", time.Now().Format(time.RFC3339), msg)
+
+	serviceLogger.mu.Lock()
+	defer serviceLogger.mu.Unlock()
+	if serviceLogger.file != nil {
+		_, _ = serviceLogger.file.WriteString(line)
+		return
+	}
+	_, _ = os.Stdout.WriteString(line)
 }
 
 func GetServiceStatus(rootPath string) (*ServiceStatus, bool, error) {
@@ -185,12 +228,18 @@ func Run(rootPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := configureNotifier(cfg); err != nil {
-		return err
-	}
 	if err := ensureRuntimeDir(rootPath); err != nil {
 		return err
 	}
+	if err := initServiceLogger(rootPath); err != nil {
+		return fmt.Errorf("failed to initialize notification service logger: %w", err)
+	}
+	defer closeServiceLogger()
+	if err := configureNotifier(cfg); err != nil {
+		return err
+	}
+	serviceLogf("notification.service.started workspace=%s provider=%s enabled=%t llm_classifier=%t poll_interval=%s silence_threshold=%s reminder_interval=%s",
+		rootPath, cfg.Provider, cfg.Enabled, cfg.LLMEnabled, cfg.PollInterval, cfg.SilenceThreshold, cfg.ReminderInterval)
 
 	status := &ServiceStatus{
 		PID:        os.Getpid(),
@@ -245,6 +294,7 @@ func Run(rootPath string) error {
 			}
 			if err := configureNotifier(cfg); err != nil {
 				status.LastError = err.Error()
+				serviceLogf("notification.config.reload_failed error=%q", err.Error())
 				_ = WriteStatus(rootPath, status)
 				continue
 			}
@@ -320,7 +370,6 @@ func evaluateWatcher(watcher *Watcher, cfg ServiceConfig, classifier SnapshotCla
 
 	observation := buildWatcherObservation(watcher, meta.SessionName, screen, now, cfg.SimilarityThreshold)
 	applyWatcherObservation(watcher, observation, cfg, classifier)
-	watcher.LastError = ""
 }
 
 func classifyQuietScreen(watcher *Watcher, classifier SnapshotClassifier, screen string, stableFor time.Duration) Classification {
@@ -393,12 +442,16 @@ func applyWatcherObservation(watcher *Watcher, observation watcherObservation, c
 	transitionWatcherState(watcher, classification.State, classification.Reason, observation.now)
 
 	if shouldNotify(previousState, watcher, cfg.ReminderInterval, observation.now) {
+		serviceLogf("notification.trigger node=%s label=%q reason=%q state=%s", watcher.NodeName, watcher.Label, classification.Reason, watcher.State)
 		if err := sendWatcherNotification(watcher.NodeName, watcher.Label, classification.Reason); err != nil {
 			watcher.LastError = err.Error()
+			serviceLogf("notification.failed node=%s label=%q error=%q", watcher.NodeName, watcher.Label, err.Error())
 			return
 		}
 		watcher.LastNotifyAt = observation.now
 		watcher.NotifyCount++
+		watcher.LastError = ""
+		serviceLogf("notification.sent node=%s label=%q notify_count=%d", watcher.NodeName, watcher.Label, watcher.NotifyCount)
 	}
 }
 

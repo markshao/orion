@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -93,6 +94,13 @@ func TestInit(t *testing.T) {
 	}
 	if config.Workspace != "workspaces" {
 		t.Errorf("config.Workspace = %q, want %q", config.Workspace, "workspaces")
+	}
+	rawConfig, err := os.ReadFile(filepath.Join(wm.RootPath, MetaDir, ConfigFile))
+	if err != nil {
+		t.Fatalf("failed to read generated config.yaml: %v", err)
+	}
+	if strings.Contains(string(rawConfig), "notifications:") {
+		t.Fatalf("workspace config.yaml should not contain notifications block")
 	}
 
 	// Verify state file

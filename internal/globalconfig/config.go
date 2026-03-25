@@ -23,8 +23,19 @@ type LLMConfig struct {
 }
 
 type NotificationsConfig struct {
-	Provider string           `yaml:"provider"`
-	Lark     NotificationLark `yaml:"lark"`
+	Enabled             *bool                           `yaml:"enabled"`
+	Provider            string                          `yaml:"provider"`
+	PollInterval        string                          `yaml:"poll_interval"`
+	SilenceThreshold    string                          `yaml:"silence_threshold"`
+	ReminderInterval    string                          `yaml:"reminder_interval"`
+	SimilarityThreshold float64                         `yaml:"similarity_threshold"`
+	TailLines           int                             `yaml:"tail_lines"`
+	LLMClassifier       NotificationLLMClassifierConfig `yaml:"llm_classifier"`
+	Lark                NotificationLark                `yaml:"lark"`
+}
+
+type NotificationLLMClassifierConfig struct {
+	Enabled *bool `yaml:"enabled"`
 }
 
 type NotificationLark struct {

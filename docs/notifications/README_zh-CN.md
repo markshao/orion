@@ -22,11 +22,12 @@ orion notification-service stop
 
 ## 配置
 
-通知配置位于 `.orion/config.yaml`：
+通知配置位于全局 `~/.orion.yaml`（所有 workspace 共用一套通知策略）：
 
 ```yaml
 notifications:
   enabled: true
+  provider: lark
   poll_interval: 5s
   silence_threshold: 20s
   reminder_interval: 5m
@@ -34,6 +35,13 @@ notifications:
   tail_lines: 80
   llm_classifier:
     enabled: true
+  lark:
+    app_id: ${ORION_LARK_APP_ID}
+    app_secret: ${ORION_LARK_APP_SECRET}
+    open_id: ${ORION_LARK_OPEN_ID}
+    base_url: https://open.feishu.cn
+    urgent_app: true
+    card_title: "boss, 我想干活"
 ```
 
 ## 官方通知通道

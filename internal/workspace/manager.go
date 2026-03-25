@@ -155,17 +155,6 @@ agents:
       command: 'qwen "{{.Prompt}}" -y'
     kimi:
       command: 'kimi -y -p "{{.Prompt}}"'
-
-notifications:
-  enabled: true
-  provider: macos
-  poll_interval: 5s
-  silence_threshold: 20s
-  reminder_interval: 5m
-  similarity_threshold: 0.99
-  tail_lines: 80
-  llm_classifier:
-    enabled: true
 `
 	if err := os.WriteFile(filepath.Join(wm.RootPath, MetaDir, ConfigFile), []byte(configContent), 0644); err != nil {
 		return err

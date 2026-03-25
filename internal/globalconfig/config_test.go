@@ -12,7 +12,11 @@ func TestLoadFromPath(t *testing.T) {
 	content := `llm:
   api_key: "abc"
 notifications:
+  enabled: true
   provider: "lark"
+  poll_interval: "5s"
+  llm_classifier:
+    enabled: false
   lark:
     app_id: "${ORION_LARK_APP_ID}"
     urgent_app: false
@@ -27,6 +31,15 @@ notifications:
 	}
 	if cfg.Notifications.Provider != "lark" {
 		t.Fatalf("unexpected provider: %q", cfg.Notifications.Provider)
+	}
+	if cfg.Notifications.Enabled == nil || !*cfg.Notifications.Enabled {
+		t.Fatalf("expected notifications.enabled true")
+	}
+	if cfg.Notifications.PollInterval != "5s" {
+		t.Fatalf("expected poll_interval 5s, got %q", cfg.Notifications.PollInterval)
+	}
+	if cfg.Notifications.LLMClassifier.Enabled == nil || *cfg.Notifications.LLMClassifier.Enabled {
+		t.Fatalf("expected llm_classifier.enabled false")
 	}
 	if cfg.Notifications.Lark.AppID != "app-1" {
 		t.Fatalf("expected env-expanded app_id, got %q", cfg.Notifications.Lark.AppID)

@@ -20,11 +20,12 @@ orion notification-service stop
 
 ## Configuration
 
-Notification settings are in `.orion/config.yaml`:
+Notification settings are in global `~/.orion.yaml` (shared across all workspaces):
 
 ```yaml
 notifications:
   enabled: true
+  provider: lark
   poll_interval: 5s
   silence_threshold: 20s
   reminder_interval: 5m
@@ -32,6 +33,13 @@ notifications:
   tail_lines: 80
   llm_classifier:
     enabled: true
+  lark:
+    app_id: ${ORION_LARK_APP_ID}
+    app_secret: ${ORION_LARK_APP_SECRET}
+    open_id: ${ORION_LARK_OPEN_ID}
+    base_url: https://open.feishu.cn
+    urgent_app: true
+    card_title: "boss, I want to work"
 ```
 
 ## Official Channels

@@ -25,3 +25,15 @@ func TestRouteReplyToNodeAllowsStaleWaitEvent(t *testing.T) {
 		t.Fatalf("should not reject stale wait_event anymore")
 	}
 }
+
+func TestEnterCountForReply(t *testing.T) {
+	if got := enterCountForReply("hello"); got != 1 {
+		t.Fatalf("expected one enter for normal reply, got %d", got)
+	}
+	if got := enterCountForReply("$push-remote"); got != 2 {
+		t.Fatalf("expected two enters for skill reply, got %d", got)
+	}
+	if got := enterCountForReply("   $push-remote"); got != 2 {
+		t.Fatalf("expected two enters for leading-space skill reply, got %d", got)
+	}
+}

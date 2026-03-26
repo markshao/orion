@@ -85,8 +85,18 @@ func RouteReplyToNode(rootPath string, meta CardActionMetadata, reply string) er
 	if err := tmux.SendLiteralKeysToPane(targetPane, reply); err != nil {
 		return err
 	}
-	if err := tmux.SendEnterToPane(targetPane); err != nil {
-		return err
+	for i := 0; i < enterCountForReply(reply); i++ {
+		if err := tmux.SendEnterToPane(targetPane); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func enterCountForReply(reply string) int {
+	reply = strings.TrimLeft(reply, " \t")
+	if strings.HasPrefix(reply, "$") {
+		return 2
+	}
+	return 1
 }

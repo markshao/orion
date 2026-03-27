@@ -259,6 +259,96 @@ func TestHasPendingWaitEventStickyUntilAck(t *testing.T) {
 	}
 }
 
+func TestMergeEvaluatedWatcherPreservesAckAndMute(t *testing.T) {
+	existing := &Watcher{
+		NodeName:         "demo",
+		Label:            "existing",
+		PaneID:           "%1",
+		WaitEventID:      5,
+		AckedWaitEventID: 4,
+		MutedWaitEventID: 5,
+	}
+	evaluated := &Watcher{
+		NodeName:         "demo",
+		Label:            "evaluated",
+		PaneID:           "%1",
+		WaitEventID:      4,
+		AckedWaitEventID: 1,
+		MutedWaitEventID: 1,
+	}
+
+	merged := mergeEvaluatedWatcher(existing, evaluated)
+	if merged == nil {
+		t.Fatalf("expected merged watcher")
+	}
+	if merged.Label != "existing" {
+		t.Fatalf("expected to keep latest label from current watcher, got %q", merged.Label)
+	}
+	if merged.WaitEventID != 5 {
+		t.Fatalf("expected wait event id to remain monotonic, got %d", merged.WaitEventID)
+	}
+	if merged.AckedWaitEventID != 4 {
+		t.Fatalf("expected acked wait event id preserved, got %d", merged.AckedWaitEventID)
+	}
+	if merged.MutedWaitEventID != 5 {
+		t.Fatalf("expected muted wait event id preserved, got %d", merged.MutedWaitEventID)
+	}
+}
+
+func TestApplyWatcherObservationStartsNewWaitEventWithinWaitingInput(t *testing.T) {
+	origNotify := sendWatcherNotification
+	defer func() { sendWatcherNotification = origNotify }()
+	sendWatcherNotification = func(watcher *Watcher, reason string) error { return nil }
+
+	now := time.Now()
+	watcher := &Watcher{
+		NodeName:       "demo",
+		Label:          "review",
+		State:          StateWaitingInput,
+		StateEnteredAt: now.Add(-2 * time.Minute),
+		WaitEventID:    3,
+		LastReason:     "old reason",
+		LastAgentBlock: "• old block",
+		LastHash:       hashScreen("old screen"),
+		StableSince:    now.Add(-10 * time.Second),
+		LastNotifyAt:   now.Add(-30 * time.Second),
+		NotifyCount:    2,
+	}
+	classifier := &stubClassifier{state: StateWaitingInput, reason: "new reason"}
+
+	applyWatcherObservation(watcher, watcherObservation{
+		now:              now,
+		screen:           "new prompt screen",
+		screenHash:       hashScreen("new prompt screen"),
+		previousScreen:   "old normalized",
+		normalizedScreen: "new normalized",
+		similarity:       1,
+		stable:           true,
+		stableFor:        20 * time.Second,
+	}, ServiceConfig{
+		ReminderInterval: 2 * time.Minute,
+		LastBlock: LastBlockConfig{
+			Enabled:  true,
+			Mode:     "prefix",
+			Prefix:   "• ",
+			MaxChars: 1000,
+		},
+	}, classifier)
+
+	if watcher.WaitEventID != 4 {
+		t.Fatalf("expected new wait event id when waiting prompt semantics change, got %d", watcher.WaitEventID)
+	}
+	if watcher.LastNotifyAt != now {
+		t.Fatalf("expected new wait event to notify immediately")
+	}
+	if watcher.NotifyCount != 1 {
+		t.Fatalf("expected notify count reset for new wait event, got %d", watcher.NotifyCount)
+	}
+	if watcher.StateEnteredAt != now {
+		t.Fatalf("expected state entry time refreshed for new wait event")
+	}
+}
+
 func TestClearWatchers(t *testing.T) {
 	rootPath := t.TempDir()
 

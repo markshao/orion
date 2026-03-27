@@ -19,6 +19,7 @@ type watcherObservation struct {
 	sessionName      string
 	screen           string
 	screenHash       string
+	previousScreen   string
 	normalizedScreen string
 	similarity       float64
 	stable           bool
@@ -344,10 +345,38 @@ func tick(rootPath string, cfg ServiceConfig, classifier SnapshotClassifier, sta
 			if existing.PaneID != evaluated.PaneID {
 				continue
 			}
-			current.Watchers[nodeName] = evaluated
+			current.Watchers[nodeName] = mergeEvaluatedWatcher(existing, evaluated)
 		}
 		return nil
 	})
+}
+
+func mergeEvaluatedWatcher(existing, evaluated *Watcher) *Watcher {
+	if evaluated == nil {
+		return existing
+	}
+	if existing == nil {
+		return evaluated
+	}
+
+	merged := *evaluated
+	merged.Label = existing.Label
+	if existing.WaitEventID > merged.WaitEventID {
+		merged.WaitEventID = existing.WaitEventID
+	}
+	if existing.AckedWaitEventID > merged.AckedWaitEventID {
+		merged.AckedWaitEventID = existing.AckedWaitEventID
+	}
+	if existing.MutedWaitEventID > merged.MutedWaitEventID {
+		merged.MutedWaitEventID = existing.MutedWaitEventID
+	}
+	if merged.AckedWaitEventID > merged.WaitEventID {
+		merged.AckedWaitEventID = merged.WaitEventID
+	}
+	if merged.MutedWaitEventID > merged.WaitEventID {
+		merged.MutedWaitEventID = merged.WaitEventID
+	}
+	return &merged
 }
 
 func evaluateWatcher(watcher *Watcher, cfg ServiceConfig, classifier SnapshotClassifier) {
@@ -432,6 +461,7 @@ func buildWatcherObservation(watcher *Watcher, sessionName, screen string, now t
 		sessionName:      sessionName,
 		screen:           screen,
 		screenHash:       watcher.LastHash,
+		previousScreen:   previousScreen,
 		normalizedScreen: normalizedScreen,
 		similarity:       similarity,
 		stable:           stable,
@@ -441,6 +471,8 @@ func buildWatcherObservation(watcher *Watcher, sessionName, screen string, now t
 
 func applyWatcherObservation(watcher *Watcher, observation watcherObservation, cfg ServiceConfig, classifier SnapshotClassifier) {
 	previousState := watcher.State
+	previousReason := watcher.LastReason
+	previousAgentBlock := watcher.LastAgentBlock
 	if !observation.stable {
 		if shouldKeepWaitingInputSticky(previousState, watcher, cfg.SilenceThreshold, observation.now) {
 			watcher.LastReason = fmt.Sprintf("waiting_input_sticky_screen_change_similarity=%.4f", observation.similarity)
@@ -450,7 +482,11 @@ func applyWatcherObservation(watcher *Watcher, observation watcherObservation, c
 		return
 	}
 
-	transitionWatcherState(watcher, StateQuietCandidate, fmt.Sprintf("stable_screen_similarity=%.4f", observation.similarity), observation.now)
+	if previousState != StateWaitingInput {
+		transitionWatcherState(watcher, StateQuietCandidate, fmt.Sprintf("stable_screen_similarity=%.4f", observation.similarity), observation.now)
+	} else {
+		watcher.LastReason = fmt.Sprintf("stable_screen_similarity=%.4f", observation.similarity)
+	}
 	classification := classifyQuietScreen(watcher, classifier, observation.screen, observation.stableFor)
 	if shouldKeepWaitingInputSticky(previousState, watcher, cfg.SilenceThreshold, observation.now) && classification.State != StateWaitingInput {
 		watcher.LastReason = fmt.Sprintf("waiting_input_sticky_classifier=%s", classification.State)
@@ -462,6 +498,9 @@ func applyWatcherObservation(watcher *Watcher, observation watcherObservation, c
 		if strings.TrimSpace(block) != "" {
 			watcher.LastAgentBlock = block
 			watcher.LastAgentBlockAt = observation.now
+		}
+		if shouldStartNewWaitEvent(previousState, observation, classification, previousReason, previousAgentBlock, watcher.LastAgentBlock) {
+			startNewWaitEvent(watcher, classification.Reason, observation.now)
 		}
 	}
 
@@ -477,6 +516,30 @@ func applyWatcherObservation(watcher *Watcher, observation watcherObservation, c
 		watcher.LastError = ""
 		serviceLogf("notification.sent node=%s label=%q notify_count=%d", watcher.NodeName, watcher.Label, watcher.NotifyCount)
 	}
+}
+
+func shouldStartNewWaitEvent(previousState string, observation watcherObservation, classification Classification, previousReason, previousAgentBlock, currentAgentBlock string) bool {
+	if previousState != StateWaitingInput || classification.State != StateWaitingInput {
+		return false
+	}
+	if strings.TrimSpace(observation.previousScreen) == "" {
+		return false
+	}
+	if observation.previousScreen == observation.normalizedScreen {
+		return false
+	}
+
+	reasonChanged := strings.TrimSpace(classification.Reason) != strings.TrimSpace(previousReason)
+	blockChanged := strings.TrimSpace(currentAgentBlock) != "" && strings.TrimSpace(currentAgentBlock) != strings.TrimSpace(previousAgentBlock)
+	return reasonChanged || blockChanged
+}
+
+func startNewWaitEvent(watcher *Watcher, reason string, now time.Time) {
+	watcher.WaitEventID++
+	watcher.StateEnteredAt = now
+	watcher.LastReason = reason
+	watcher.LastNotifyAt = time.Time{}
+	watcher.NotifyCount = 0
 }
 
 func shouldKeepWaitingInputSticky(previousState string, watcher *Watcher, silenceThreshold time.Duration, now time.Time) bool {

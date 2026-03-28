@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -119,8 +118,19 @@ var notificationServiceListWatchersCmd = &cobra.Command{
 			return
 		}
 
+		verbose, _ := cmd.Flags().GetBool("verbose")
+		showAgentBlock, _ := cmd.Flags().GetBool("show-agent-block")
+
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "NODE\tLABEL\tSESSION\tPANE\tSTATE\tPENDING\tMUTED\tLAST CHANGE\tLAST NOTIFY\tNOTIFY COUNT\tREASON\tLAST BLOCK")
+		if verbose {
+			if showAgentBlock {
+				fmt.Fprintln(w, "NODE\tLABEL\tSESSION\tPANE\tSTATE\tWAIT EVENT\tSHOULD NOTIFY\tLAST CHANGE\tLAST NOTIFY\tNOTIFY COUNT\tREASON\tLAST BLOCK")
+			} else {
+				fmt.Fprintln(w, "NODE\tLABEL\tSESSION\tPANE\tSTATE\tWAIT EVENT\tSHOULD NOTIFY\tLAST CHANGE\tLAST NOTIFY\tNOTIFY COUNT\tREASON")
+			}
+		} else {
+			fmt.Fprintln(w, "NODE\tSTATE\tLAST CHANGE\tWAIT EVENT\tSHOULD NOTIFY")
+		}
 		for _, watcher := range registry.Watchers {
 			lastChange := "-"
 			if !watcher.LastChangeAt.IsZero() {
@@ -134,35 +144,93 @@ var notificationServiceListWatchersCmd = &cobra.Command{
 			if label == "" {
 				label = "-"
 			}
-			pending := "-"
-			if notification.HasPendingWaitEvent(watcher) {
-				pending = "wait-input"
+			hasPendingWaitEvent := notification.HasPendingWaitEvent(watcher)
+			isMuted := watcher.MutedWaitEventID >= watcher.WaitEventID && watcher.WaitEventID > 0
+			waitEventStatus := "-"
+			switch {
+			case isMuted:
+				waitEventStatus = "muted"
+			case hasPendingWaitEvent:
+				waitEventStatus = "pending"
 			}
-			muted := "-"
-			if watcher.MutedWaitEventID >= watcher.WaitEventID && watcher.WaitEventID > 0 {
-				muted = "muted"
+			shouldNotify := "no"
+			if hasPendingWaitEvent && !isMuted {
+				shouldNotify = "yes"
 			}
-			lastBlock := "-"
-			if watcher.LastAgentBlock != "" {
-				lastBlock = strings.ReplaceAll(watcher.LastAgentBlock, "\n", "\\n")
+			if verbose {
+				if showAgentBlock {
+					lastBlock := "-"
+					if watcher.LastAgentBlock != "" {
+						lastBlock = formatSingleLine(watcher.LastAgentBlock)
+					}
+					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
+						watcher.NodeName,
+						label,
+						watcher.SessionName,
+						watcher.PaneID,
+						watcher.State,
+						waitEventStatus,
+						shouldNotify,
+						lastChange,
+						lastNotify,
+						watcher.NotifyCount,
+						formatSingleLine(watcher.LastReason),
+						lastBlock,
+					)
+				} else {
+					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\n",
+						watcher.NodeName,
+						label,
+						watcher.SessionName,
+						watcher.PaneID,
+						watcher.State,
+						waitEventStatus,
+						shouldNotify,
+						lastChange,
+						lastNotify,
+						watcher.NotifyCount,
+						formatSingleLine(watcher.LastReason),
+					)
+				}
+				continue
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 				watcher.NodeName,
-				label,
-				watcher.SessionName,
-				watcher.PaneID,
 				watcher.State,
-				pending,
-				muted,
 				lastChange,
-				lastNotify,
-				watcher.NotifyCount,
-				watcher.LastReason,
-				lastBlock,
+				waitEventStatus,
+				shouldNotify,
 			)
 		}
 		w.Flush()
 	},
+}
+
+func formatSingleLine(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return flattenMultiline(s)
+}
+
+func flattenMultiline(s string) string {
+	if s == "" {
+		return s
+	}
+	out := make([]rune, 0, len(s))
+	lastWasSpace := false
+	for _, r := range s {
+		if r == '\n' || r == '\r' || r == '\t' || r == ' ' {
+			if !lastWasSpace {
+				out = append(out, ' ')
+				lastWasSpace = true
+			}
+			continue
+		}
+		out = append(out, r)
+		lastWasSpace = false
+	}
+	return string(out)
 }
 
 var notificationServiceCleanWatchersCmd = &cobra.Command{
@@ -208,6 +276,8 @@ func init() {
 	notificationServiceCmd.AddCommand(notificationServiceStartCmd)
 	notificationServiceCmd.AddCommand(notificationServiceStopCmd)
 	notificationServiceCmd.AddCommand(notificationServiceStatusCmd)
+	notificationServiceListWatchersCmd.Flags().BoolP("verbose", "v", false, "Show detailed watcher fields")
+	notificationServiceListWatchersCmd.Flags().Bool("show-agent-block", false, "Include extracted agent block (verbose output)")
 	notificationServiceCmd.AddCommand(notificationServiceListWatchersCmd)
 	notificationServiceCmd.AddCommand(notificationServiceCleanWatchersCmd)
 	notificationServiceCmd.AddCommand(notificationServiceRunCmd)

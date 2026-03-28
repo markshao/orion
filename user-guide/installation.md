@@ -59,7 +59,8 @@ Run the following command to verify the installation:
 
 ```bash
 orion --version
-# Should output: Orion version v1.0.0
+# Local build (make local-install): Orion version dev
+# install.sh (GitHub release): Orion version vX.Y.Z
 ```
 
 ## Next Steps

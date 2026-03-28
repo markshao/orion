@@ -59,7 +59,8 @@ make uninstall
 
 ```bash
 orion --version
-# 应输出: Orion version v1.0.0
+# 本地构建安装（make local-install）：Orion version dev
+# install.sh（GitHub Release）：Orion version vX.Y.Z
 ```
 
 ## 下一步

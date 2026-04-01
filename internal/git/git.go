@@ -2,12 +2,15 @@ package git
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
+
+const originHeadsFetchRefspec = "+refs/heads/*:refs/remotes/origin/*"
 
 type WorktreeStatus struct {
 	Dirty       bool
@@ -158,11 +161,17 @@ func CloneBare(url, path string) error {
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git clone --bare failed: %s: %w", string(output), err)
 	}
+	if err := EnsureOriginHeadsFetchRefspec(path); err != nil {
+		return err
+	}
 	return nil
 }
 
 // Fetch updates remote-tracking refs in the repository.
 func Fetch(repoPath string) error {
+	if err := EnsureOriginHeadsFetchRefspec(repoPath); err != nil {
+		return err
+	}
 	cmd := exec.Command("git", "fetch", "origin", "--prune")
 	cmd.Dir = repoPath
 	if output, err := cmd.CombinedOutput(); err != nil {
@@ -173,6 +182,9 @@ func Fetch(repoPath string) error {
 
 // FetchWithOutput updates remote-tracking refs in the repository and returns git's output.
 func FetchWithOutput(repoPath string) (string, error) {
+	if err := EnsureOriginHeadsFetchRefspec(repoPath); err != nil {
+		return "", err
+	}
 	cmd := exec.Command("git", "fetch", "origin", "--prune")
 	cmd.Dir = repoPath
 	output, err := cmd.CombinedOutput()
@@ -180,6 +192,33 @@ func FetchWithOutput(repoPath string) (string, error) {
 		return string(output), fmt.Errorf("git fetch failed: %s: %w", string(output), err)
 	}
 	return string(output), nil
+}
+
+// EnsureOriginHeadsFetchRefspec guarantees the bare repo fetches all remote heads
+// into refs/remotes/origin/*, so later ref resolution is based on current remote state.
+func EnsureOriginHeadsFetchRefspec(repoPath string) error {
+	cmd := exec.Command("git", "config", "--get-all", "remote.origin.fetch")
+	cmd.Dir = repoPath
+	output, err := cmd.Output()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
+			return fmt.Errorf("failed to inspect remote.origin.fetch: %w", err)
+		}
+	}
+
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		if strings.TrimSpace(line) == originHeadsFetchRefspec {
+			return nil
+		}
+	}
+
+	setCmd := exec.Command("git", "config", "--add", "remote.origin.fetch", originHeadsFetchRefspec)
+	setCmd.Dir = repoPath
+	if setOutput, err := setCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to set remote.origin.fetch: %s: %w", string(setOutput), err)
+	}
+	return nil
 }
 
 // ResolveRef returns the commit SHA for a ref.

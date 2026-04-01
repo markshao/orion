@@ -133,3 +133,37 @@ func TestRunSyncRefWithBranchFlagWorksOutsideNode(t *testing.T) {
 		t.Fatalf("missing workspace sync banner in output: %s", stdout.String())
 	}
 }
+
+func TestRunSyncRefRepairsMissingFetchRefspecBeforeFetch(t *testing.T) {
+	rootPath, repoPath, cleanup := setupTestWorkspaceForRun(t)
+	defer cleanup()
+
+	wm, err := workspace.NewManager(rootPath)
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	nodeName := "sync-repair-node"
+	if err := wm.SpawnNode(nodeName, "feature/repair", "main", "test", false); err != nil {
+		t.Fatalf("SpawnNode failed: %v", err)
+	}
+
+	if output, err := exec.Command("git", "-C", repoPath, "config", "--unset-all", "remote.origin.fetch").CombinedOutput(); err != nil {
+		t.Fatalf("failed to unset remote.origin.fetch: %v, output: %s", err, output)
+	}
+
+	node := wm.State.Nodes[nodeName]
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := runSyncRef(node.WorktreePath, &stdout, &stderr, ""); err != nil {
+		t.Fatalf("runSyncRef failed: %v, stderr: %s", err, stderr.String())
+	}
+
+	output, err := exec.Command("git", "-C", repoPath, "config", "--get-all", "remote.origin.fetch").CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to read remote.origin.fetch: %v, output: %s", err, output)
+	}
+	if !strings.Contains(string(output), "+refs/heads/*:refs/remotes/origin/*") {
+		t.Fatalf("expected sync-ref to restore remote.origin.fetch, got %q", strings.TrimSpace(string(output)))
+	}
+}

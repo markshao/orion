@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -333,5 +334,107 @@ func TestGetWorktreeStatusWithAheadBehindAndDirty(t *testing.T) {
 	}
 	if !status.Dirty {
 		t.Fatalf("expected dirty status, got %#v", status)
+	}
+}
+
+func TestCloneBareConfiguresOriginHeadsFetchRefspec(t *testing.T) {
+	remotePath, err := os.MkdirTemp("", "orion-bare-remote")
+	if err != nil {
+		t.Fatalf("failed to create remote dir: %v", err)
+	}
+	defer os.RemoveAll(remotePath)
+
+	if output, err := exec.Command("git", "init", "--bare", remotePath).CombinedOutput(); err != nil {
+		t.Fatalf("failed to init bare remote: %v, output: %s", err, output)
+	}
+
+	repoPath, err := os.MkdirTemp("", "orion-bare-clone")
+	if err != nil {
+		t.Fatalf("failed to create clone dir: %v", err)
+	}
+	defer os.RemoveAll(repoPath)
+
+	if err := CloneBare(remotePath, repoPath); err != nil {
+		t.Fatalf("CloneBare failed: %v", err)
+	}
+
+	output, err := exec.Command("git", "-C", repoPath, "config", "--get-all", "remote.origin.fetch").CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to read remote.origin.fetch: %v, output: %s", err, output)
+	}
+	if !strings.Contains(string(output), originHeadsFetchRefspec) {
+		t.Fatalf("expected fetch refspec %q, got %q", originHeadsFetchRefspec, strings.TrimSpace(string(output)))
+	}
+}
+
+func TestFetchRepairsMissingOriginHeadsFetchRefspec(t *testing.T) {
+	rootPath, cleanup := setupTestRepo(t)
+	defer cleanup()
+
+	remotePath, err := os.MkdirTemp("", "orion-fetch-remote")
+	if err != nil {
+		t.Fatalf("failed to create remote dir: %v", err)
+	}
+	defer os.RemoveAll(remotePath)
+
+	if output, err := exec.Command("git", "init", "--bare", remotePath).CombinedOutput(); err != nil {
+		t.Fatalf("failed to init bare remote: %v, output: %s", err, output)
+	}
+	if output, err := exec.Command("git", "-C", rootPath, "remote", "add", "origin", remotePath).CombinedOutput(); err != nil {
+		t.Fatalf("failed to add remote: %v, output: %s", err, output)
+	}
+	if output, err := exec.Command("git", "-C", rootPath, "push", "-u", "origin", "main").CombinedOutput(); err != nil {
+		t.Fatalf("failed to push main: %v, output: %s", err, output)
+	}
+
+	clonePath, err := os.MkdirTemp("", "orion-fetch-clone")
+	if err != nil {
+		t.Fatalf("failed to create temp clone dir: %v", err)
+	}
+	defer os.RemoveAll(clonePath)
+
+	if output, err := exec.Command("git", "clone", "--branch", "main", remotePath, clonePath).CombinedOutput(); err != nil {
+		t.Fatalf("failed to clone remote: %v, output: %s", err, output)
+	}
+	_ = exec.Command("git", "-C", clonePath, "config", "user.email", "test@example.com").Run()
+	_ = exec.Command("git", "-C", clonePath, "config", "user.name", "Test User").Run()
+
+	newBranch := "feature/remote-sync"
+	if output, err := exec.Command("git", "-C", clonePath, "checkout", "-b", newBranch).CombinedOutput(); err != nil {
+		t.Fatalf("failed to create remote branch: %v, output: %s", err, output)
+	}
+	branchFile := filepath.Join(clonePath, "branch.txt")
+	if err := os.WriteFile(branchFile, []byte("remote branch"), 0644); err != nil {
+		t.Fatalf("failed to write branch file: %v", err)
+	}
+	if output, err := exec.Command("git", "-C", clonePath, "add", "branch.txt").CombinedOutput(); err != nil {
+		t.Fatalf("failed to add branch file: %v, output: %s", err, output)
+	}
+	if output, err := exec.Command("git", "-C", clonePath, "commit", "-m", "remote branch commit").CombinedOutput(); err != nil {
+		t.Fatalf("failed to commit remote branch: %v, output: %s", err, output)
+	}
+	if output, err := exec.Command("git", "-C", clonePath, "push", "-u", "origin", newBranch).CombinedOutput(); err != nil {
+		t.Fatalf("failed to push remote branch: %v, output: %s", err, output)
+	}
+
+	barePath, err := os.MkdirTemp("", "orion-fetch-bare")
+	if err != nil {
+		t.Fatalf("failed to create bare clone dir: %v", err)
+	}
+	defer os.RemoveAll(barePath)
+
+	if output, err := exec.Command("git", "clone", "--bare", remotePath, barePath).CombinedOutput(); err != nil {
+		t.Fatalf("failed to create bare clone: %v, output: %s", err, output)
+	}
+	if output, err := exec.Command("git", "-C", barePath, "config", "--add", "remote.origin.fetch", "+refs/tags/*:refs/tags/*").CombinedOutput(); err != nil {
+		t.Fatalf("failed to seed incorrect fetch refspec: %v, output: %s", err, output)
+	}
+
+	if err := Fetch(barePath); err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if output, err := exec.Command("git", "-C", barePath, "rev-parse", "--verify", "refs/remotes/origin/"+newBranch+"^{commit}").CombinedOutput(); err != nil {
+		t.Fatalf("expected remote branch ref after fetch repair: %v, output: %s", err, output)
 	}
 }

@@ -31,8 +31,9 @@ func fallbackLabelFromDescription(description string) string {
 }
 
 var aiCmd = &cobra.Command{
-	Use:   "ai <description>",
-	Short: "Create a development node using natural language",
+	Use:          "ai <description>",
+	Short:        "Create a development node using natural language",
+	SilenceUsage: true,
 	Long: `Describe your development task in natural language, and AI will automatically generate branch and node names for you.
 
 Examples:

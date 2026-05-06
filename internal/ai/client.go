@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"orion/internal/log"
 	"strings"
+	"time"
 
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
@@ -49,6 +51,8 @@ func NewClient() (*Client, error) {
 
 // GenerateSpawnPlan 根据用户描述生成分支和 node 名称
 func (c *Client) GenerateSpawnPlan(description string) (*SpawnPlan, error) {
+	log.Info("ai: GenerateSpawnPlan start description=%q model=%q", description, c.model)
+
 	// 构建 system prompt
 	systemPrompt := `你是一个 Git 分支命名专家。根据用户的开发任务描述，生成合适的分支名、node 名和任务摘要 label。
 
@@ -80,16 +84,50 @@ label 规则:
 
 	content, err := c.GenerateText(systemPrompt, userPrompt, 0.2, 256)
 	if err != nil {
+		log.Error("ai: GenerateSpawnPlan initial request failed description=%q err=%v", description, err)
 		return nil, err
 	}
 
 	// 解析 JSON 响应
-	return parseSpawnPlan(content)
+	plan, parseErr := parseSpawnPlan(content)
+	if parseErr == nil {
+		log.Info("ai: GenerateSpawnPlan parsed plan branch=%q node=%q base=%q label=%q", plan.BranchName, plan.NodeName, plan.BaseBranch, plan.Label)
+		return plan, nil
+	}
+	log.Error("ai: GenerateSpawnPlan parse failed description=%q err=%v raw_response=%q", description, parseErr, content)
+
+	// Some models occasionally ignore the JSON-only instruction on the first try.
+	// Retry once with a stricter prompt before surfacing the parsing error.
+	repairPrompt := fmt.Sprintf(`开发任务描述: %q
+
+请重新生成结果，并严格遵守以下要求:
+- 只输出一个合法 JSON 对象
+- 不要包含 markdown、解释、Usage、Flags 或其他文本
+- 字段必须是 branch_name、node_name、base_branch、label
+- branch_name 使用 feature/xxx、fix/xxx、chore/xxx 之一
+- node_name 使用 kebab-case
+- label 使用和用户描述相同的语言
+`, description)
+
+	repairedContent, repairErr := c.GenerateText(systemPrompt, repairPrompt, 0.2, 256)
+	if repairErr == nil {
+		if repairedPlan, repairedParseErr := parseSpawnPlan(repairedContent); repairedParseErr == nil {
+			log.Info("ai: GenerateSpawnPlan repaired plan branch=%q node=%q base=%q label=%q", repairedPlan.BranchName, repairedPlan.NodeName, repairedPlan.BaseBranch, repairedPlan.Label)
+			return repairedPlan, nil
+		} else {
+			log.Error("ai: GenerateSpawnPlan repaired parse failed description=%q err=%v raw_response=%q", description, repairedParseErr, repairedContent)
+		}
+	} else {
+		log.Error("ai: GenerateSpawnPlan repair request failed description=%q err=%v", description, repairErr)
+	}
+
+	return nil, parseErr
 }
 
 // GenerateText sends a system and user prompt and returns the first text choice.
 func (c *Client) GenerateText(systemPrompt, userPrompt string, temperature float64, maxTokens int) (string, error) {
 	ctx := context.Background()
+	logLLMRequest(c.model, systemPrompt, userPrompt, temperature, maxTokens)
 
 	// 调用 LLM
 	messages := []llms.MessageContent{
@@ -98,33 +136,73 @@ func (c *Client) GenerateText(systemPrompt, userPrompt string, temperature float
 	}
 
 	effectiveTemp := normalizeTemperatureForModel(c.model, temperature)
-	response, err := c.llm.GenerateContent(ctx, messages,
-		llms.WithTemperature(effectiveTemp),
-		llms.WithMaxTokens(maxTokens),
-	)
+	response, err := c.generateContentWithRetry(ctx, messages, effectiveTemp, maxTokens)
 	if err != nil {
-		// Some models (e.g. OpenAI reasoning models like o1/o3) only accept temperature=1.
-		// If we hit that constraint, retry once with temperature=1 to avoid breaking users
-		// who set these models in ~/.orion.yaml.
-		if effectiveTemp != 1 && shouldForceTemperatureOne(err) {
-			retryResp, retryErr := c.llm.GenerateContent(ctx, messages,
-				llms.WithTemperature(1),
-				llms.WithMaxTokens(maxTokens),
-			)
-			if retryErr == nil {
-				response = retryResp
-			} else {
-				return "", fmt.Errorf("LLM call failed (temp=%.2f, retry temp=1): %w", effectiveTemp, retryErr)
-			}
-		} else {
-			return "", fmt.Errorf("LLM call failed: %w", err)
-		}
+		log.Error("ai: GenerateText failed model=%q requested_temp=%.2f effective_temp=%.2f max_tokens=%d err=%v", c.model, temperature, effectiveTemp, maxTokens, err)
+		return "", err
 	}
 
 	if len(response.Choices) == 0 {
+		log.Error("ai: GenerateText empty response model=%q requested_temp=%.2f effective_temp=%.2f max_tokens=%d", c.model, temperature, effectiveTemp, maxTokens)
 		return "", fmt.Errorf("no response from LLM")
 	}
+	logLLMResponse(c.model, response.Choices[0].Content)
 	return response.Choices[0].Content, nil
+}
+
+func (c *Client) generateContentWithRetry(ctx context.Context, messages []llms.MessageContent, temperature float64, maxTokens int) (*llms.ContentResponse, error) {
+	resp, err := c.generateContentAttempts(ctx, messages, temperature, maxTokens)
+	if err == nil {
+		return resp, nil
+	}
+
+	// Some models (e.g. OpenAI reasoning models like o1/o3) only accept temperature=1.
+	if temperature != 1 && shouldForceTemperatureOne(err) {
+		retryResp, retryErr := c.generateContentAttempts(ctx, messages, 1, maxTokens)
+		if retryErr == nil {
+			return retryResp, nil
+		}
+		return nil, fmt.Errorf("LLM call failed (temp=%.2f, retry temp=1): %w", temperature, retryErr)
+	}
+
+	return nil, fmt.Errorf("LLM call failed: %w", err)
+}
+
+func (c *Client) generateContentAttempts(ctx context.Context, messages []llms.MessageContent, temperature float64, maxTokens int) (*llms.ContentResponse, error) {
+	log.Info("ai: GenerateContent attempt=1 model=%q temperature=%.2f max_tokens=%d", c.model, temperature, maxTokens)
+	resp, err := c.llm.GenerateContent(ctx, messages,
+		llms.WithTemperature(temperature),
+		llms.WithMaxTokens(maxTokens),
+	)
+	if err == nil {
+		log.Info("ai: GenerateContent attempt=1 succeeded model=%q choices=%d", c.model, len(resp.Choices))
+		return resp, nil
+	}
+	log.Error("ai: GenerateContent attempt=1 failed model=%q temperature=%.2f max_tokens=%d err=%v", c.model, temperature, maxTokens, err)
+	if !shouldRetryLLMError(err) {
+		return nil, err
+	}
+
+	lastErr := err
+	for attempt := 1; attempt <= 2; attempt++ {
+		time.Sleep(time.Duration(attempt) * time.Second)
+		log.Info("ai: GenerateContent retry=%d model=%q temperature=%.2f max_tokens=%d", attempt, c.model, temperature, maxTokens)
+		retryResp, retryErr := c.llm.GenerateContent(ctx, messages,
+			llms.WithTemperature(temperature),
+			llms.WithMaxTokens(maxTokens),
+		)
+		if retryErr == nil {
+			log.Info("ai: GenerateContent retry=%d succeeded model=%q choices=%d", attempt, c.model, len(retryResp.Choices))
+			return retryResp, nil
+		}
+		log.Error("ai: GenerateContent retry=%d failed model=%q temperature=%.2f max_tokens=%d err=%v", attempt, c.model, temperature, maxTokens, retryErr)
+		lastErr = retryErr
+		if !shouldRetryLLMError(retryErr) {
+			break
+		}
+	}
+
+	return nil, fmt.Errorf("LLM call failed after retries: %w", lastErr)
 }
 
 func normalizeTemperatureForModel(model string, requested float64) float64 {
@@ -144,17 +222,27 @@ func shouldForceTemperatureOne(err error) bool {
 	return strings.Contains(s, "invalid temperature") && strings.Contains(s, "only 1")
 }
 
+func shouldRetryLLMError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "429") ||
+		strings.Contains(s, "rate limit") ||
+		strings.Contains(s, "overloaded") ||
+		strings.Contains(s, "timeout") ||
+		strings.Contains(s, "temporarily unavailable")
+}
+
 // parseSpawnPlan 解析 LLM 返回的 JSON
 func parseSpawnPlan(content string) (*SpawnPlan, error) {
-	// 清理可能的 markdown 代码块
-	content = strings.TrimSpace(content)
-	content = strings.TrimPrefix(content, "```json")
-	content = strings.TrimPrefix(content, "```")
-	content = strings.TrimSuffix(content, "```")
-	content = strings.TrimSpace(content)
+	content = normalizePlanContent(content)
 
 	var plan SpawnPlan
 	if err := json.Unmarshal([]byte(content), &plan); err != nil {
+		if looksLikeCLIUsage(content) {
+			return nil, fmt.Errorf("failed to parse plan JSON: model returned CLI help text instead of JSON; check ~/.orion.yaml llm.base_url and llm.model\nContent: %s", content)
+		}
 		return nil, fmt.Errorf("failed to parse plan JSON: %w\nContent: %s", err, content)
 	}
 
@@ -173,4 +261,74 @@ func parseSpawnPlan(content string) (*SpawnPlan, error) {
 	plan.Label = strings.ReplaceAll(plan.Label, "\r", " ")
 
 	return &plan, nil
+}
+
+func normalizePlanContent(content string) string {
+	content = strings.TrimSpace(content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+
+	if jsonBody := extractFirstJSONObject(content); jsonBody != "" {
+		return jsonBody
+	}
+
+	return content
+}
+
+func extractFirstJSONObject(content string) string {
+	start := strings.Index(content, "{")
+	if start == -1 {
+		return ""
+	}
+
+	inString := false
+	escaped := false
+	depth := 0
+	for i := start; i < len(content); i++ {
+		ch := content[i]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+
+		switch ch {
+		case '"':
+			inString = true
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return strings.TrimSpace(content[start : i+1])
+			}
+		}
+	}
+
+	return ""
+}
+
+func looksLikeCLIUsage(content string) bool {
+	s := strings.TrimSpace(strings.ToLower(content))
+	return strings.HasPrefix(s, "usage:") ||
+		(strings.Contains(s, "usage:") && strings.Contains(s, "flags:"))
+}
+
+func logLLMRequest(model, systemPrompt, userPrompt string, temperature float64, maxTokens int) {
+	log.Info("ai: LLM request model=%q temperature=%.2f max_tokens=%d system_prompt=%q user_prompt=%q", model, temperature, maxTokens, systemPrompt, userPrompt)
+}
+
+func logLLMResponse(model, content string) {
+	log.Info("ai: LLM response model=%q content=%q", model, content)
 }

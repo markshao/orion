@@ -97,18 +97,51 @@ func (c *Client) GenerateText(systemPrompt, userPrompt string, temperature float
 		llms.TextParts(llms.ChatMessageTypeHuman, userPrompt),
 	}
 
+	effectiveTemp := normalizeTemperatureForModel(c.model, temperature)
 	response, err := c.llm.GenerateContent(ctx, messages,
-		llms.WithTemperature(temperature),
+		llms.WithTemperature(effectiveTemp),
 		llms.WithMaxTokens(maxTokens),
 	)
 	if err != nil {
-		return "", fmt.Errorf("LLM call failed: %w", err)
+		// Some models (e.g. OpenAI reasoning models like o1/o3) only accept temperature=1.
+		// If we hit that constraint, retry once with temperature=1 to avoid breaking users
+		// who set these models in ~/.orion.yaml.
+		if effectiveTemp != 1 && shouldForceTemperatureOne(err) {
+			retryResp, retryErr := c.llm.GenerateContent(ctx, messages,
+				llms.WithTemperature(1),
+				llms.WithMaxTokens(maxTokens),
+			)
+			if retryErr == nil {
+				response = retryResp
+			} else {
+				return "", fmt.Errorf("LLM call failed (temp=%.2f, retry temp=1): %w", effectiveTemp, retryErr)
+			}
+		} else {
+			return "", fmt.Errorf("LLM call failed: %w", err)
+		}
 	}
 
 	if len(response.Choices) == 0 {
 		return "", fmt.Errorf("no response from LLM")
 	}
 	return response.Choices[0].Content, nil
+}
+
+func normalizeTemperatureForModel(model string, requested float64) float64 {
+	m := strings.ToLower(strings.TrimSpace(model))
+	// Heuristic: OpenAI reasoning models (o1/o3/...) require temperature=1.
+	if len(m) >= 2 && m[0] == 'o' && m[1] >= '0' && m[1] <= '9' {
+		return 1
+	}
+	return requested
+}
+
+func shouldForceTemperatureOne(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "invalid temperature") && strings.Contains(s, "only 1")
 }
 
 // parseSpawnPlan 解析 LLM 返回的 JSON
